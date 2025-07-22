@@ -5,6 +5,7 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
+    "local": "node dev.js",
     "start": "node index.js",
     "dev": "nodemon index.js",
     "seed": "node drizzle/seeder/service-seeder.js",
