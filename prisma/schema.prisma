@@ -1,0 +1,41 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String   @id @default(cuid())
+  firstName       String
+  lastName        String
+  mobileNumber    String?
+  email           String?  @unique
+  password        String?
+  provider        String?
+  providerId      String?
+  emailVerifiedAt DateTime?
+  role            Role     @default(USER)
+  canAccessCMS    Boolean  @default(false)
+  service         Service? @relation(fields: [serviceId], references: [id])
+  serviceId       Int?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Service {
+  id        Int      @id @default(autoincrement())
+  name      String
+  users     User[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum Role {
+  ADMIN
+  USER
+}
