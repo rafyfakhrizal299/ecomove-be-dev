@@ -9,6 +9,6 @@ app.use(express.json())
 app.get('/ping', (req, res) => {
   res.json({ message: 'pong' })
 })
-app.use(authRoutes)
+app.use('/auth', authRoutes)
 
 export default app
