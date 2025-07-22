@@ -5,6 +5,7 @@ import jwksClient from 'jwks-rsa'
 import { eq } from 'drizzle-orm'
 import dotenv from 'dotenv'
 import db from '../../lib/db.js'
+import { v4 as uuidv4 } from 'uuid'
 
 import { users, services } from '../../drizzle/schema.js'
 
@@ -12,6 +13,7 @@ const googleClient = new OAuth2Client()
 const appleJwks = jwksClient({ jwksUri: 'https://appleid.apple.com/auth/keys' })
 
 const TOKEN_EXPIRES_IN = '7d'
+const userId = uuidv4()
 
 function generateToken(user) {
   const JWT_SECRET = process.env.JWT_SECRET
@@ -139,6 +141,7 @@ export const register = async (req, res) => {
   const hashed = await bcrypt.hash(password, 10)
 
   const insertResult = await db.insert(users).values({
+    id: userId,
     firstName,
     lastName,
     email,
