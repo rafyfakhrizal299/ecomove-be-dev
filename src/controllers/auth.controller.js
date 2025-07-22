@@ -4,6 +4,7 @@ import { OAuth2Client } from 'google-auth-library'
 import jwksClient from 'jwks-rsa'
 import { eq } from 'drizzle-orm'
 import dotenv from 'dotenv'
+import db from '../../lib/db.js'
 
 import { users, services } from '../../drizzle/schema.js'
 
@@ -125,18 +126,18 @@ export const register = async (req, res) => {
     return res.status(400).json({ status: 400, message: 'Missing required fields.', results: null })
   }
 
-  const existing = (await req.db.select().from(users).where(eq(users.email, email)))[0]
+  const existing = (await db.select().from(users).where(eq(users.email, email)))[0]
   if (existing) {
     return res.status(409).json({ status: 409, message: 'Email already registered.', results: null })
   }
 
-  const service = (await req.db.select().from(services).where(eq(services.id, serviceId)))[0]
+  const service = (await db.select().from(services).where(eq(services.id, serviceId)))[0]
   if (!service) {
     return res.status(400).json({ status: 400, message: 'Invalid serviceId.', results: null })
   }
 
   const hashed = await bcrypt.hash(password, 10)
-  const insertResult = await req.db.insert(users).values({
+  const insertResult = await db.insert(users).values({
     firstName,
     lastName,
     email,
