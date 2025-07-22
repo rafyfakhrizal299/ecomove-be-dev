@@ -137,6 +137,7 @@ export const register = async (req, res) => {
   }
 
   const hashed = await bcrypt.hash(password, 10)
+
   const insertResult = await db.insert(users).values({
     firstName,
     lastName,
@@ -144,12 +145,20 @@ export const register = async (req, res) => {
     mobileNumber,
     password: hashed,
     serviceId,
-    role: 'USER'
+    role: 'USER',
+    provider: null,
+    providerId: null,
+    emailVerifiedAt: null,
   }).returning()
 
   const user = insertResult[0]
   const token = generateToken(user)
-  res.status(201).json({ status: 201, message: 'Registration successful', results: { token, user } })
+
+  res.status(201).json({
+    status: 201,
+    message: 'Registration successful',
+    results: { token, user },
+  })
 }
 
 export const userLogin = async (req, res) => {
