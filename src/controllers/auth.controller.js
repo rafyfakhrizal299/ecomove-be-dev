@@ -30,7 +30,7 @@ export const login = async (req, res) => {
     return res.status(400).json({ status: 400, message: 'Email and password are required.', results: null })
   }
 
-  const result = await req.db.select().from(users).where(eq(users.email, email))
+  const result = await db.select().from(users).where(eq(users.email, email))
   const user = result[0]
 
   if (!user || !user.password || !(await bcrypt.compare(password, user.password))) {
@@ -65,10 +65,10 @@ export const oauthLogin = async (req, res) => {
 
       const { sub, email, given_name, family_name } = payload
 
-      let user = (await req.db.select().from(users).where(eq(users.providerId, sub)))[0]
+      let user = (await db.select().from(users).where(eq(users.providerId, sub)))[0]
 
       if (!user) {
-        const insertResult = await req.db.insert(users).values({
+        const insertResult = await db.insert(users).values({
           firstName: given_name,
           lastName: family_name || '',
           email,
@@ -97,10 +97,10 @@ export const oauthLogin = async (req, res) => {
       }
 
       const { sub, email } = payload
-      let user = (await req.db.select().from(users).where(eq(users.providerId, sub)))[0]
+      let user = (await db.select().from(users).where(eq(users.providerId, sub)))[0]
 
       if (!user) {
-        const insertResult = await req.db.insert(users).values({
+        const insertResult = await db.insert(users).values({
           firstName: 'Apple',
           lastName: 'User',
           email,
@@ -171,7 +171,7 @@ export const userLogin = async (req, res) => {
     return res.status(400).json({ status: 400, message: 'Email and password are required.', results: null })
   }
 
-  const result = await req.db.select().from(users).where(eq(users.email, email))
+  const result = await db.select().from(users).where(eq(users.email, email))
   const user = result[0]
 
   if (!user || !user.password || !(await bcrypt.compare(password, user.password))) {
@@ -189,7 +189,7 @@ export const userLogin = async (req, res) => {
 export const getProfile = async (req, res) => {
   const userId = req.user.id
 
-  const result = await req.db.select({
+  const result = await db.select({
     id: users.id,
     firstName: users.firstName,
     lastName: users.lastName,
