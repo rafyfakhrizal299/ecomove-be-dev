@@ -13,7 +13,6 @@ const googleClient = new OAuth2Client()
 const appleJwks = jwksClient({ jwksUri: 'https://appleid.apple.com/auth/keys' })
 
 const TOKEN_EXPIRES_IN = '7d'
-const userId = uuidv4()
 
 function generateToken(user) {
   const JWT_SECRET = process.env.JWT_SECRET
@@ -141,7 +140,7 @@ export const register = async (req, res) => {
   const hashed = await bcrypt.hash(password, 10)
 
   const insertResult = await db.insert(users).values({
-    id: userId,
+    id: uuidv4(),
     firstName,
     lastName,
     email,

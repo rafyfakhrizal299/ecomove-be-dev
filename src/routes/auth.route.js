@@ -10,4 +10,5 @@ router.post('/oauth', oauthLogin)
 router.post('/register', register)
 router.get('/profile', authMiddleware, getProfile)
 
+
 export default router
