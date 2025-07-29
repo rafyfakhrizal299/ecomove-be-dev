@@ -27,7 +27,7 @@ function generateToken(user) {
 export const getAllServices = async (req, res) => {
   try {
     const result = await db.select().from(services)
-    res.json({ status: 200, message: 'Login successful', results: result })
+    res.json({ status: 200, message: 'Success', results: result })
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch services', error: err.message })
   }
