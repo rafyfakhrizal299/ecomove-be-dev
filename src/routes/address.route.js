@@ -13,14 +13,14 @@ import adminOnly from '../middlewares/admin.middleware.js'
 const router = express.Router()
 
 router.get('/get-by-user/:userId', authMiddleware, getSavedAddressesByUser)
-
-router.use(authMiddleware, adminOnly)
-
-router.get('/', getAllSavedAddresses)
 router.get('/:id', getSavedAddressById)
 router.post('/', createSavedAddress)
 router.put('/:id', updateSavedAddress)
 router.delete('/:id', deleteSavedAddress)
+
+router.use(authMiddleware, adminOnly)
+
+router.get('/', getAllSavedAddresses)
 
 
 export default router
