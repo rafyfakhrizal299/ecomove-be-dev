@@ -12,7 +12,7 @@ import adminOnly from '../middlewares/admin.middleware.js'
 
 const router = express.Router()
 
-router.get('/get-by-user/:userId', getSavedAddressesByUser)
+router.get('/get-by-user/:userId', authMiddleware, getSavedAddressesByUser)
 
 router.use(authMiddleware, adminOnly)
 
