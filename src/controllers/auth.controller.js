@@ -301,26 +301,35 @@ export const userLogin = async (req, res) => {
 }
 
 export const getProfile = async (req, res) => {
-  const userId = req.user.id
+  try {
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ message: 'Unauthorized: No user info in token' });
+    }
 
-  const result = await db.select({
-    id: users.id,
-    firstName: users.firstName,
-    lastName: users.lastName,
-    email: users.email,
-    mobileNumber: users.mobileNumber,
-    serviceId: users.serviceId,
-    role: users.role
-  }).from(users).where(eq(users.id, userId))
+    const userId = req.user.id;
 
-  const user = result[0]
+    const result = await db.select({
+      id: users.id,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      email: users.email,
+      mobileNumber: users.mobileNumber,
+      serviceId: users.serviceId,
+      role: users.role
+    }).from(users).where(eq(users.id, userId));
 
-  if (!user) {
-    return res.status(404).json({ status: 404, message: 'User not found', results: null })
+    const user = result[0];
+
+    if (!user) {
+      return res.status(404).json({ status: 404, message: 'User not found', results: null });
+    }
+
+    res.json({ status: 200, message: 'Profile fetched successfully', results: user });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ status: 500, message: 'Internal server error', results: null });
   }
-
-  res.json({ status: 200, message: 'Profile fetched successfully', results: user })
-}
+};
 
 export const listUsers = async (req, res) => {
   try {
