@@ -308,48 +308,71 @@ export const userLogin = async (req, res) => {
 export const getProfile = async (req, res) => {
   try {
     if (!req.user || !req.user.id) {
-      return res.status(401).json({ message: 'Unauthorized: No user info in token' });
+      return res.status(401).json({
+        status: 401,
+        message: 'Unauthorized: No user info in token',
+        results: null,
+      });
     }
 
     const userId = req.user.id;
 
-    // Ambil user
-    const result = await db.select({
-      id: users.id,
-      firstName: users.firstName,
-      lastName: users.lastName,
-      email: users.email,
-      mobileNumber: users.mobileNumber,
-      role: users.role,
-      createdAt: users.createdAt,
-      updatedAt: users.updatedAt
-    }).from(users).where(eq(users.id, userId));
+    // Ambil data user dasar
+    const result = await db
+      .select({
+        id: users.id,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        email: users.email,
+        mobileNumber: users.mobileNumber,
+        role: users.role,
+        createdAt: users.createdAt,
+        updatedAt: users.updatedAt,
+      })
+      .from(users)
+      .where(eq(users.id, userId));
 
     const user = result[0];
 
     if (!user) {
-      return res.status(404).json({ status: 404, message: 'User not found', results: null });
+      return res.status(404).json({
+        status: 404,
+        message: 'User not found',
+        results: null,
+      });
     }
 
-    // Ambil serviceId dari tabel relasi
-    const userServiceRecords = await db
-      .select({ serviceId: userServices.serviceId })
+    // Ambil relasi service yang dimiliki user
+    const userServicesResult = await db
+      .select({
+        id: services.id,
+        name: services.name,
+      })
       .from(userServices)
+      .leftJoin(services, eq(userServices.serviceId, services.id))
       .where(eq(userServices.userId, userId));
 
-    const serviceIds = userServiceRecords.map((r) => r.serviceId);
+    const servicesList = userServicesResult.map((s) => ({
+      id: s.id,
+      name: s.name,
+    }));
 
+    // Return data profile lengkap
     res.json({
       status: 200,
       message: 'Profile fetched successfully',
       results: {
         ...user,
-        serviceIds // array of related service IDs
-      }
+        services: servicesList,
+      },
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ status: 500, message: 'Internal server error', results: null });
+    res.status(500).json({
+      status: 500,
+      message: 'Internal server error',
+      results: null,
+    });
   }
 };
 
