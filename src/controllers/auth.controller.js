@@ -426,7 +426,7 @@ export const listUsers = async (req, res) => {
         serviceName: services.name
       })
       .from(userServices)
-      .where(userServices.userId.in(userIds))
+      .where(inArray(userServices.userId, userIds))
       .innerJoin(services, eq(userServices.serviceId, services.id));
 
     const usersWithServices = rawUsers.map(user => {
