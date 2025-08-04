@@ -444,7 +444,7 @@ export const listUsers = async (req, res) => {
       status: 200,
       message: 'Success',
       results: {
-        users: usersWithServices,
+        data: usersWithServices,
         page,
         limit,
         total,
