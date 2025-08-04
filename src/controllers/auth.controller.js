@@ -313,14 +313,16 @@ export const getProfile = async (req, res) => {
 
     const userId = req.user.id;
 
+    // Ambil user
     const result = await db.select({
       id: users.id,
       firstName: users.firstName,
       lastName: users.lastName,
       email: users.email,
       mobileNumber: users.mobileNumber,
-      serviceId: users.serviceId,
-      role: users.role
+      role: users.role,
+      createdAt: users.createdAt,
+      updatedAt: users.updatedAt
     }).from(users).where(eq(users.id, userId));
 
     const user = result[0];
@@ -329,12 +331,28 @@ export const getProfile = async (req, res) => {
       return res.status(404).json({ status: 404, message: 'User not found', results: null });
     }
 
-    res.json({ status: 200, message: 'Profile fetched successfully', results: user });
+    // Ambil serviceId dari tabel relasi
+    const userServiceRecords = await db
+      .select({ serviceId: userServices.serviceId })
+      .from(userServices)
+      .where(eq(userServices.userId, userId));
+
+    const serviceIds = userServiceRecords.map((r) => r.serviceId);
+
+    res.json({
+      status: 200,
+      message: 'Profile fetched successfully',
+      results: {
+        ...user,
+        serviceIds // array of related service IDs
+      }
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ status: 500, message: 'Internal server error', results: null });
   }
 };
+
 
 export const listUsers = async (req, res) => {
   try {
