@@ -138,19 +138,21 @@ export const register = async (req, res) => {
     email,
     password,
     mobileNumber,
-    serviceId,
-    role, // optional
+    serviceId, // harus array of string
+    role,
   } = req.body;
 
-  if (!email || !password || !firstName || !lastName || !serviceId) {
+  if (
+    !email || !password || !firstName || !lastName ||
+    !serviceId || !Array.isArray(serviceId) || serviceId.length === 0
+  ) {
     return res.status(400).json({
       status: 400,
-      message: 'Missing required fields.',
+      message: 'Missing or invalid required fields.',
       results: null,
     });
   }
 
-  // Cek duplikat email
   const existing = (await db.select().from(users).where(eq(users.email, email)))[0];
   if (existing) {
     return res.status(409).json({
@@ -160,22 +162,21 @@ export const register = async (req, res) => {
     });
   }
 
-  // Validasi serviceId
-  const service = (await db.select().from(services).where(eq(services.id, serviceId)))[0];
-  if (!service) {
+  const validServices = await db.select().from(services).where(
+    inArray(services.id, serviceId)
+  );
+
+  if (validServices.length !== serviceId.length) {
     return res.status(400).json({
       status: 400,
-      message: 'Invalid serviceId.',
+      message: 'One or more serviceIds are invalid.',
       results: null,
     });
   }
 
-  // 🛡️ Tentukan role
   let newRole = 'USER';
-
   if (role === 'ADMIN') {
-    // Validasi apakah requester adalah admin
-    const requester = req.user; // butuh middleware auth
+    const requester = req.user;
 
     if (!requester || requester.role !== 'ADMIN') {
       return res.status(403).json({
@@ -204,10 +205,12 @@ export const register = async (req, res) => {
     emailVerifiedAt: null,
   }).returning();
 
-  await db.insert(userServices).values({
-    userId,
-    serviceId,
-  });
+  await db.insert(userServices).values(
+    serviceId.map(id => ({
+      userId,
+      serviceId: id,
+    }))
+  );
 
   const { password: _, ...userWithoutPassword } = insertResult[0];
   const token = generateToken(userWithoutPassword);
@@ -221,6 +224,7 @@ export const register = async (req, res) => {
     },
   });
 };
+
 
 export const editUser = async (req, res) => {
   const targetUserId = req.params.id;
