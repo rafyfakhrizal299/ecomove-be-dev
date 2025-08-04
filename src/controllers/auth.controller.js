@@ -5,7 +5,7 @@ import jwksClient from 'jwks-rsa'
 import dotenv from 'dotenv'
 import db from '../../lib/db.js'
 import { v4 as uuidv4 } from 'uuid'
-import { and, ilike, eq, count, or } from 'drizzle-orm';
+import { and, ilike, eq, count, or, inArray } from 'drizzle-orm';
 
 import { users, services, userServices } from '../../drizzle/schema.js'
 
