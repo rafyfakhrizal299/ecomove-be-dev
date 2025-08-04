@@ -2,12 +2,12 @@ import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
 import { OAuth2Client } from 'google-auth-library'
 import jwksClient from 'jwks-rsa'
-import { eq } from 'drizzle-orm'
 import dotenv from 'dotenv'
 import db from '../../lib/db.js'
 import { v4 as uuidv4 } from 'uuid'
+import { and, ilike, eq, count } from 'drizzle-orm';
 
-import { users, services } from '../../drizzle/schema.js'
+import { users, services, userServices } from '../../drizzle/schema.js'
 
 const googleClient = new OAuth2Client()
 const appleJwks = jwksClient({ jwksUri: 'https://appleid.apple.com/auth/keys' })
@@ -53,6 +53,7 @@ export const login = async (req, res) => {
   const token = generateToken(user)
   res.json({ status: 200, message: 'Login successful', results: { token, user } })
 }
+
 
 function getAppleKey(header, callback) {
   appleJwks.getSigningKey(header.kid, (err, key) => {
@@ -131,47 +132,151 @@ export const oauthLogin = async (req, res) => {
 }
 
 export const register = async (req, res) => {
-  const { firstName, lastName, email, password, mobileNumber, serviceId } = req.body
+  const {
+    firstName,
+    lastName,
+    email,
+    password,
+    mobileNumber,
+    serviceId,
+    role, // optional
+  } = req.body;
 
-  if (!email || !password || !firstName || !lastName) {
-    return res.status(400).json({ status: 400, message: 'Missing required fields.', results: null })
+  if (!email || !password || !firstName || !lastName || !serviceId) {
+    return res.status(400).json({
+      status: 400,
+      message: 'Missing required fields.',
+      results: null,
+    });
   }
 
-  const existing = (await db.select().from(users).where(eq(users.email, email)))[0]
+  // Cek duplikat email
+  const existing = (await db.select().from(users).where(eq(users.email, email)))[0];
   if (existing) {
-    return res.status(409).json({ status: 409, message: 'Email already registered.', results: null })
+    return res.status(409).json({
+      status: 409,
+      message: 'Email already registered.',
+      results: null,
+    });
   }
 
-  const service = (await db.select().from(services).where(eq(services.id, serviceId)))[0]
+  // Validasi serviceId
+  const service = (await db.select().from(services).where(eq(services.id, serviceId)))[0];
   if (!service) {
-    return res.status(400).json({ status: 400, message: 'Invalid serviceId.', results: null })
+    return res.status(400).json({
+      status: 400,
+      message: 'Invalid serviceId.',
+      results: null,
+    });
   }
 
-  const hashed = await bcrypt.hash(password, 10)
+  // 🛡️ Tentukan role
+  let newRole = 'USER';
+
+  if (role === 'ADMIN') {
+    // Validasi apakah requester adalah admin
+    const requester = req.user; // butuh middleware auth
+
+    if (!requester || requester.role !== 'ADMIN') {
+      return res.status(403).json({
+        status: 403,
+        message: 'Only admins can assign ADMIN role.',
+        results: null,
+      });
+    }
+
+    newRole = 'ADMIN';
+  }
+
+  const hashed = await bcrypt.hash(password, 10);
+  const userId = uuidv4();
 
   const insertResult = await db.insert(users).values({
-    id: uuidv4(),
+    id: userId,
     firstName,
     lastName,
     email,
     mobileNumber,
     password: hashed,
-    serviceId,
-    role: 'USER',
+    role: newRole,
     provider: null,
     providerId: null,
     emailVerifiedAt: null,
-  }).returning()
+  }).returning();
 
-  const user = insertResult[0]
-  const token = generateToken(user)
+  await db.insert(userServices).values({
+    userId,
+    serviceId,
+  });
+
+  const { password: _, ...userWithoutPassword } = insertResult[0];
+  const token = generateToken(userWithoutPassword);
 
   res.status(201).json({
     status: 201,
     message: 'Registration successful',
-    results: { token, user },
-  })
-}
+    results: {
+      token,
+      user: userWithoutPassword,
+    },
+  });
+};
+
+export const editUser = async (req, res) => {
+  const targetUserId = req.params.id;
+  const requester = req.user;
+
+  const isSelf = requester.id === targetUserId;
+  const isAdmin = requester.role === 'ADMIN';
+
+  if (!isSelf && !isAdmin) {
+    return res.status(403).json({ status: 403, message: 'Unauthorized to edit this user.', results: null });
+  }
+
+  const {
+    firstName,
+    lastName,
+    email,
+    mobileNumber,
+    password,
+    canAccessCMS,
+    role,
+    serviceIds
+  } = req.body;
+
+  const updates = {};
+  if (firstName) updates.firstName = firstName;
+  if (lastName) updates.lastName = lastName;
+  if (email) updates.email = email;
+  if (mobileNumber) updates.mobileNumber = mobileNumber;
+  if (password) updates.password = await bcrypt.hash(password, 10);
+
+  // Admin only fields
+  if (isAdmin) {
+    if (role) updates.role = role;
+    if (typeof canAccessCMS === 'boolean') updates.canAccessCMS = canAccessCMS;
+  }
+
+  // Update user
+  await db.update(users).set(updates).where(eq(users.id, targetUserId));
+
+  if (isAdmin && Array.isArray(serviceIds)) {
+    // Validasi semua serviceId
+    const validServices = await db.select().from(services).where(
+      services.id.in(serviceIds)
+    );
+    if (validServices.length !== serviceIds.length) {
+      return res.status(400).json({ status: 400, message: 'Some serviceIds are invalid', results: null });
+    }
+
+    await db.delete(userServices).where(eq(userServices.userId, targetUserId));
+    await db.insert(userServices).values(
+      serviceIds.map(id => ({ userId: targetUserId, serviceId: id }))
+    );
+  }
+
+  res.status(200).json({ status: 200, message: 'User updated successfully', results: null });
+};
 
 export const userLogin = async (req, res) => {
   const { email, password } = req.body
@@ -216,3 +321,125 @@ export const getProfile = async (req, res) => {
 
   res.json({ status: 200, message: 'Profile fetched successfully', results: user })
 }
+
+export const listUsers = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const search = req.query.search?.toLowerCase() || '';
+    const roleFilter = req.query.role?.toUpperCase(); // 'ADMIN' / 'USER'
+
+    const offset = (page - 1) * limit;
+
+    // Bangun filter query
+    const filters = [];
+    if (search) {
+      filters.push(
+        or(
+          ilike(users.firstName, `%${search}%`),
+          ilike(users.lastName, `%${search}%`),
+          ilike(users.email, `%${search}%`)
+        )
+      );
+    }
+    if (roleFilter) {
+      filters.push(eq(users.role, roleFilter));
+    }
+
+    const whereClause = filters.length > 0 ? and(...filters) : undefined;
+
+    // Hitung total user
+    const totalQuery = await db
+      .select({ count: count() })
+      .from(users)
+      .where(whereClause);
+    const total = parseInt(totalQuery[0].count);
+
+    // Ambil daftar user
+    const rawUsers = await db
+      .select()
+      .from(users)
+      .where(whereClause)
+      .limit(limit)
+      .offset(offset);
+
+    const userIds = rawUsers.map(u => u.id);
+    const serviceMappings = await db
+      .select({
+        userId: userServices.userId,
+        serviceId: services.id,
+        serviceName: services.name
+      })
+      .from(userServices)
+      .where(userServices.userId.in(userIds))
+      .innerJoin(services, eq(userServices.serviceId, services.id));
+
+    const usersWithServices = rawUsers.map(user => {
+      const services = serviceMappings
+        .filter(s => s.userId === user.id)
+        .map(s => ({
+          id: s.serviceId,
+          name: s.serviceName
+        }));
+      const { password, ...userWithoutPassword } = user;
+      return { ...userWithoutPassword, services };
+    });
+
+    res.json({
+      status: 200,
+      message: 'Success',
+      results: {
+        users: usersWithServices,
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      status: 500,
+      message: 'Internal server error',
+      results: null
+    });
+  }
+};
+export const deleteUser = async (req, res) => {
+  const userId = req.params.id;
+  const currentUser = req.user;
+  try {
+    if (currentUser.role !== 'ADMIN') {
+      return res.status(403).json({
+        status: 403,
+        message: 'Only admins can delete users',
+        results: null,
+      });
+    }
+
+    if (currentUser.id === userId) {
+      return res.status(400).json({
+        status: 400,
+        message: 'You cannot delete your own account.',
+        results: null,
+      });
+    }
+
+    await db.delete(userServices).where(eq(userServices.userId, userId));
+
+    const deleted = await db.delete(users).where(eq(users.id, userId));
+
+    res.json({
+      status: 200,
+      message: 'User deleted successfully',
+      results: null,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      status: 500,
+      message: 'Internal server error',
+      results: null,
+    });
+  }
+};

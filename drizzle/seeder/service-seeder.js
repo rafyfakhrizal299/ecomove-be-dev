@@ -11,7 +11,7 @@ async function seed() {
   const existingServices = await db.select().from(services)
 
   if (existingServices.length === 0) {
-    await db.insert(service).values([
+    await db.insert(services).values([
       { name: 'Business Deliveries (Non-food)' },
       { name: 'Business Deliveries (Food)' },
       { name: 'Personal and Business' },

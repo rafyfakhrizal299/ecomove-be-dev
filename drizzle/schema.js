@@ -24,10 +24,16 @@ export const users = pgTable('User', {
   emailVerifiedAt: timestamp('emailVerifiedAt', { mode: 'date' }),
   role: roleEnum('role').default('USER').notNull(),
   canAccessCMS: boolean('canAccessCMS').default(false).notNull(),
-  serviceId: integer('serviceId'),
   createdAt: timestamp('createdAt', { mode: 'date' }).defaultNow(),
   updatedAt: timestamp('updatedAt', { mode: 'date' }).defaultNow(),
 })
+
+export const userServices = pgTable('UserService', {
+  userId: varchar('userId', { length: 255 }).notNull().references(() => users.id),
+  serviceId: integer('serviceId').notNull().references(() => services.id),
+}, (t) => ({
+  pk: unique().on(t.userId, t.serviceId),
+}))
 
 export const savedAddresses = pgTable('saved_addresses', {
   id: serial('id').primaryKey(),

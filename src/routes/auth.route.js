@@ -1,6 +1,7 @@
 import express from 'express'
-import { login, oauthLogin, register, userLogin, getProfile, getAllServices  } from '../controllers/auth.controller.js'
+import { login, oauthLogin, register, userLogin, getProfile, getAllServices, listUsers, deleteUser  } from '../controllers/auth.controller.js'
 import authMiddleware from '../middlewares/auth.middleware.js'
+import adminOnly from '../middlewares/admin.middleware.js'
 
 const router = express.Router()
 
@@ -10,6 +11,12 @@ router.post('/oauth', oauthLogin)
 router.post('/register', register)
 router.get('/services', getAllServices)
 router.get('/profile', authMiddleware, getProfile)
+router.put('/edit-user/:id', authMiddleware, getProfile)
+
+router.use(authMiddleware, adminOnly)
+
+router.get('/list-pagination', authMiddleware, listUsers)
+router.delete('/users/:id', authMiddleware, deleteUser);
 
 
 export default router
