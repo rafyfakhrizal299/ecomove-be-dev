@@ -229,14 +229,6 @@ export const register = async (req, res) => {
 
 export const editUser = async (req, res) => {
   const targetUserId = req.params.id;
-  const requester = req.user;
-
-  const isSelf = requester.id === targetUserId;
-  const isAdmin = requester.role === 'ADMIN';
-
-  if (!isSelf && !isAdmin) {
-    return res.status(403).json({ status: 403, message: 'Unauthorized to edit this user.', results: null });
-  }
 
   const {
     firstName,
@@ -254,33 +246,55 @@ export const editUser = async (req, res) => {
   if (lastName) updates.lastName = lastName;
   if (email) updates.email = email;
   if (mobileNumber) updates.mobileNumber = mobileNumber;
-  if (password) updates.password = await bcrypt.hash(password, 10);
+  if (typeof canAccessCMS === 'boolean') updates.canAccessCMS = canAccessCMS;
+  if (role) updates.role = role;
 
-  // Admin only fields
-  if (isAdmin) {
-    if (role) updates.role = role;
-    if (typeof canAccessCMS === 'boolean') updates.canAccessCMS = canAccessCMS;
+  if (password) {
+    updates.password = await bcrypt.hash(password, 10);
+  }
+
+  // Jangan update jika tidak ada field valid
+  if (Object.keys(updates).length === 0 && !Array.isArray(serviceIds)) {
+    return res.status(400).json({
+      status: 400,
+      message: 'No valid fields provided for update',
+      results: null
+    });
   }
 
   // Update user
   await db.update(users).set(updates).where(eq(users.id, targetUserId));
 
-  if (isAdmin && Array.isArray(serviceIds)) {
-    // Validasi semua serviceId
-    const validServices = await db.select().from(services).where(
-      services.id.in(serviceIds)
-    );
+  // Update relasi ke services jika ada
+  if (Array.isArray(serviceIds)) {
+    const validServices = await db
+      .select()
+      .from(services)
+      .where(services.id.in(serviceIds));
+
     if (validServices.length !== serviceIds.length) {
-      return res.status(400).json({ status: 400, message: 'Some serviceIds are invalid', results: null });
+      return res.status(400).json({
+        status: 400,
+        message: 'Some serviceIds are invalid',
+        results: null
+      });
     }
 
+    // Replace all existing mappings
     await db.delete(userServices).where(eq(userServices.userId, targetUserId));
     await db.insert(userServices).values(
-      serviceIds.map(id => ({ userId: targetUserId, serviceId: id }))
+      serviceIds.map(serviceId => ({
+        userId: targetUserId,
+        serviceId
+      }))
     );
   }
 
-  res.status(200).json({ status: 200, message: 'User updated successfully', results: null });
+  return res.status(200).json({
+    status: 200,
+    message: 'User updated successfully',
+    results: null
+  });
 };
 
 export const userLogin = async (req, res) => {
