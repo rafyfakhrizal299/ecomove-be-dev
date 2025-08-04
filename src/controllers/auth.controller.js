@@ -253,6 +253,13 @@ export const editUser = async (req, res) => {
     updates.password = await bcrypt.hash(password, 10);
   }
 
+  // Tambahkan updatedAt
+  updates.updatedAt = new Date();
+
+  console.log('Updating user:', targetUserId);
+  console.log('Updates:', updates);
+  console.log('Service IDs:', serviceIds);
+
   // Jangan update jika tidak ada field valid
   if (Object.keys(updates).length === 0 && !Array.isArray(serviceIds)) {
     return res.status(400).json({
@@ -270,7 +277,7 @@ export const editUser = async (req, res) => {
     const validServices = await db
       .select()
       .from(services)
-      .where(services.id.in(serviceIds));
+      .where(inArray(services.id, serviceIds.map(Number))); // <== pastikan integer
 
     if (validServices.length !== serviceIds.length) {
       return res.status(400).json({
@@ -280,12 +287,11 @@ export const editUser = async (req, res) => {
       });
     }
 
-    // Replace all existing mappings
     await db.delete(userServices).where(eq(userServices.userId, targetUserId));
     await db.insert(userServices).values(
       serviceIds.map(serviceId => ({
         userId: targetUserId,
-        serviceId
+        serviceId: Number(serviceId)
       }))
     );
   }
@@ -296,6 +302,7 @@ export const editUser = async (req, res) => {
     results: null
   });
 };
+
 
 export const userLogin = async (req, res) => {
   const { email, password } = req.body
