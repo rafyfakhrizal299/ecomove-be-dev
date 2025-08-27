@@ -68,6 +68,7 @@ export const transactions = pgTable('transactions', {
   pinnedLocation: text('pinned_location'),
   contactName: text('contact_name'),
   contactNumber: text('contact_number'),
+  contactEmail: varchar('contact_email'),
 
   pickupDate: date('pickup_date').notNull(),
   deliveryType: text('delivery_type').notNull(),
@@ -79,6 +80,8 @@ export const transactions = pgTable('transactions', {
   cod: boolean('cod').default(false),
   itemProtection: boolean('item_protection').default(false),
   deliveryNotes: text('delivery_notes'),
+  orderid: varchar('orderid', { length: 100 }), // from FIUU
+  tranID: varchar('tranID', { length: 100 }), // from FIUU
   paymentStatus: text('payment_status').default('pending'),
   modeOfPayment: text('mode_of_payment').default('fiuuu'),
   driver: text('driver'),
@@ -86,6 +89,16 @@ export const transactions = pgTable('transactions', {
   createdAt: timestamp('created_at', { mode: 'date' }).defaultNow(),
   updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow(),
 })
+
+export const deliveryRates = pgTable("delivery_rates", {
+  id: serial("id").primaryKey(),
+  deliveryType: text("delivery_type").notNull(), // "same-day" | "standard"
+  packageSize: text("package_size").notNull(), // "small" | "large"
+  minDistance: integer("min_distance").notNull(), // dalam M
+  maxDistance: integer("max_distance"),          // nullable kalau jarak terakhir >10KM
+  price: integer("price").notNull(),             // harga dalam Peso
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+});
 
 export const transactionReceivers = pgTable('transaction_receivers', {
   id: serial('id').primaryKey(),

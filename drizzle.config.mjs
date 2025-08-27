@@ -6,6 +6,6 @@ export default {
   out: './drizzle/migrations',
   dialect: 'postgresql',
   dbCredentials: {
-    url: 'postgres://postgres:password@localhost:5433/ecomove?sslmode=disable'
+    url: process.env.DATABASE_URL,
   }
 }
