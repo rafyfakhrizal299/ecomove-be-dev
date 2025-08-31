@@ -68,6 +68,7 @@ export const transactions = pgTable('transactions', {
   pinnedLocation: text('pinned_location'),
   contactName: text('contact_name'),
   contactNumber: text('contact_number'),
+  contactEmail: varchar('contact_email'),
 
   pickupDate: date('pickup_date').notNull(),
   deliveryType: text('delivery_type').notNull(),
@@ -79,13 +80,25 @@ export const transactions = pgTable('transactions', {
   cod: boolean('cod').default(false),
   itemProtection: boolean('item_protection').default(false),
   deliveryNotes: text('delivery_notes'),
+  orderid: varchar('orderid', { length: 100 }), // from FIUU
+  tranID: varchar('tranID', { length: 100 }), // from FIUU
   paymentStatus: text('payment_status').default('pending'),
   modeOfPayment: text('mode_of_payment').default('fiuuu'),
-  driver: text('driver'),
+  driverId: varchar("driver_id", { length: 255 }).references(() => drivers.id), // FK ke drivers.id
 
   createdAt: timestamp('created_at', { mode: 'date' }).defaultNow(),
   updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow(),
 })
+
+export const deliveryRates = pgTable("delivery_rates", {
+  id: serial("id").primaryKey(),
+  deliveryType: text("delivery_type").notNull(), // "same-day" | "standard"
+  packageSize: text("package_size").notNull(), // "small" | "large"
+  minDistance: integer("min_distance").notNull(), // dalam M
+  maxDistance: integer("max_distance"),          // nullable kalau jarak terakhir >10KM
+  price: integer("price").notNull(),             // harga dalam Peso
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+});
 
 export const transactionReceivers = pgTable('transaction_receivers', {
   id: serial('id').primaryKey(),
@@ -108,3 +121,14 @@ export const transactionReceivers = pgTable('transaction_receivers', {
   createdAt: timestamp('created_at', { mode: 'date' }).defaultNow(),
   updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow(),
 })
+
+export const drivers = pgTable("drivers", {
+  id: varchar('id', { length: 255 }).primaryKey().notNull(), // UUID
+  name: varchar("name", { length: 255 }).notNull(),
+  phoneNumber: varchar("phone_number", { length: 20 }).notNull(),
+  email: varchar("email", { length: 255 }),
+  licenseNumber: varchar("license_number", { length: 100 }),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
+});

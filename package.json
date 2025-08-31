@@ -16,7 +16,9 @@
   "license": "ISC",
   "dependencies": {
     "bcrypt": "^6.0.0",
+    "body-parser": "^2.2.0",
     "cors": "^2.8.5",
+    "crypto": "^1.0.1",
     "cuid": "^3.0.0",
     "dotenv": "^16.6.1",
     "drizzle-kit": "^0.31.4",
@@ -26,6 +28,7 @@
     "jsonwebtoken": "^9.0.2",
     "jwks-rsa": "^3.2.0",
     "pg": "^8.16.3",
+    "serverless-http": "^3.2.0",
     "uuid": "^11.1.0"
   },
   "devDependencies": {
