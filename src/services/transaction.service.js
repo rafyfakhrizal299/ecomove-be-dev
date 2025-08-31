@@ -1,6 +1,6 @@
 import { db } from "../../drizzle/db.js";
 import { transactions, deliveryRates } from "../../drizzle/schema.js";
-import { eq, and, lte, gte, isNull, or } from "drizzle-orm";
+import { eq, and, lte, gte, isNull, or, sql } from "drizzle-orm";
 
 export async function getRate(deliveryType, packageSize, distance) {
   const rows = await db.select()
@@ -74,4 +74,56 @@ export async function deleteTransaction(id) {
     .where(eq(transactions.id, id))
     .returning();
   return deleted;
+}
+
+export async function getTransactions({ page = 1, limit = 10, filters = {} }) {
+  const offset = (page - 1) * limit;
+
+  const conditions = [];
+  if (filters.paymentStatus) {
+    conditions.push(eq(transactions.paymentStatus, filters.paymentStatus));
+  }
+  if (filters.deliveryType) {
+    conditions.push(eq(transactions.deliveryType, filters.deliveryType));
+  }
+  if (filters.userId) {
+    conditions.push(eq(transactions.userId, filters.userId));
+  }
+
+  // ✅ kondisi WHERE
+  let whereCondition = undefined;
+  if (conditions.length === 1) {
+    whereCondition = conditions[0];
+  } else if (conditions.length > 1) {
+    whereCondition = and(...conditions);
+  }
+
+  console.log("Where Condition:", whereCondition);
+
+  // ✅ total count
+  const totalQuery = db
+    .select({ count: sql`count(*)` })
+    .from(transactions)
+    .where(whereCondition);
+
+  // ✅ data query
+  const dataQuery = db
+    .select()
+    .from(transactions)
+    .where(whereCondition)
+    .limit(limit)
+    .offset(offset);
+
+  const [{ count }] = await totalQuery;
+  const rows = await dataQuery;
+
+  return {
+    data: rows,
+    pagination: {
+      page,
+      limit,
+      total: Number(count),
+      totalPages: Math.ceil(Number(count) / limit),
+    },
+  };
 }

@@ -84,7 +84,7 @@ export const transactions = pgTable('transactions', {
   tranID: varchar('tranID', { length: 100 }), // from FIUU
   paymentStatus: text('payment_status').default('pending'),
   modeOfPayment: text('mode_of_payment').default('fiuuu'),
-  driver: text('driver'),
+  driverId: varchar("driver_id", { length: 255 }).references(() => drivers.id), // FK ke drivers.id
 
   createdAt: timestamp('created_at', { mode: 'date' }).defaultNow(),
   updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow(),
@@ -121,3 +121,14 @@ export const transactionReceivers = pgTable('transaction_receivers', {
   createdAt: timestamp('created_at', { mode: 'date' }).defaultNow(),
   updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow(),
 })
+
+export const drivers = pgTable("drivers", {
+  id: varchar('id', { length: 255 }).primaryKey().notNull(), // UUID
+  name: varchar("name", { length: 255 }).notNull(),
+  phoneNumber: varchar("phone_number", { length: 20 }).notNull(),
+  email: varchar("email", { length: 255 }),
+  licenseNumber: varchar("license_number", { length: 100 }),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
+});

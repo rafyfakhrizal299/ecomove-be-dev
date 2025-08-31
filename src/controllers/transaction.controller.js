@@ -47,3 +47,21 @@ export const deleteTransaction = async (req, res) => {
     res.status(400).json({ status: 400, message: err.message });
   }
 };
+
+export const getTransactions = async (req, res) => {
+  try {
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 10;
+
+    const filters = {
+      paymentStatus: req.query.paymentStatus,
+      deliveryType: req.query.deliveryType,
+      userId: req.query.userId,
+    };
+
+    const result = await trxService.getTransactions({ page, limit, filters });
+    res.json({ status: 200, message: "Success", ...result });
+  } catch (err) {
+    res.status(500).json({ status: 500, message: err.message });
+  }
+};
