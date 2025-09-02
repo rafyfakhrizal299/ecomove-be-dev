@@ -44,18 +44,21 @@ export const savedAddresses = pgTable('saved_addresses', {
   pinnedLocation: text('pinned_location').notNull(),
   contactName: text('contact_name').notNull(),
   contactNumber: text('contact_number').notNull(),
+  contactEmail: text('contact_email'),
   type: text('type').notNull(), // 'sender' | 'receiver'
   createdAt: timestamp('created_at', { mode: 'date' }).defaultNow(),
   updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow(),
-}, (table) => ({
-  uniqueSaved: unique('unique_saved').on(
-    table.userId,
-    table.pinnedLocation,
-    table.contactName,
-    table.contactNumber,
-    table.type
-  )
-}))
+}
+// , (table) => ({
+//   uniqueSaved: unique('unique_saved').on(
+//     table.userId,
+//     table.pinnedLocation,
+//     table.contactName,
+//     table.contactNumber,
+//     table.type
+//   )
+// })
+)
 
 // export const transactions = pgTable('transactions', {
 //   id: serial('id').primaryKey(),
@@ -108,6 +111,8 @@ export const transactions = pgTable('transactions', {
   // Total hasil kalkulasi receiver
   totalDistance: numeric('total_distance'),
   totalFee: numeric('total_fee'),
+  deliveryNotes: text('delivery_notes'),
+  pickupTime: timestamp('pickup_time', { mode: 'date' }),
 
   orderid: varchar('orderid', { length: 100 }),
   tranID: varchar('tranID', { length: 100 }),
