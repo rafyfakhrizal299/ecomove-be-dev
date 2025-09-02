@@ -13,7 +13,7 @@ export async function createPaymentService(transactionId) {
 
   const transaction = trx[0]
   const orderid = "ORD_" + Date.now()
-  const amount = transaction.fee?.toString() || "0.00"
+  const amount = transaction.totalFee?.toString() || "0.00"
     // const amount = "100.00"
   const currency = "PHP"
   const vcode = generateVCode(amount, orderid, process.env.FIUU_MERCHANT_ID)
@@ -41,9 +41,14 @@ export async function createPaymentService(transactionId) {
 }
 
 export async function notifyPaymentService(data) {
+  console.log("Payment notify:", data)
   if (!verifySKey(data)) throw new Error("Invalid skey")
 
-  const status = data.status === "00" ? "success" : "failed"
+  let status
+  if (data.status === "00") status = "success"
+  else if (data.status === "22") status = "pending"
+  else status = "failed"
+
 
   await db.update(transactions)
     .set({ paymentStatus: status, tranID: data.tranID })

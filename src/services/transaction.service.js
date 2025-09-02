@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from "uuid";
 import { db } from "../../drizzle/db.js";
+// import db from '../../lib/db.js';
 import { transactions, deliveryRates, savedAddresses, transactionReceivers } from "../../drizzle/schema.js";
 import { eq, and, lte, gte, isNull, or, sql } from "drizzle-orm";
 
@@ -76,7 +77,8 @@ export async function createTransaction(data) {
     }
 
     // generate tranID
-    const tranID = uuidv4();
+    // const tranID = uuidv4();
+    const pickupTime = new Date(data.pickupTime)
 
     // ✅ simpan transaksi dengan data sender
     const [trx] = await db
@@ -90,8 +92,10 @@ export async function createTransaction(data) {
         contactName: senderData.contactName,
         contactNumber: senderData.contactNumber,
         contactEmail: senderData.contactEmail,
+        pickupTime,
+        deliveryNotes: data.deliveryNotes || null,
         orderid: null, // 🚫 jangan dari payload
-        tranID,
+        // tranID,
         paymentStatus: "pending",
         modeOfPayment: data.modeOfPayment || "fiuuu",
       })
