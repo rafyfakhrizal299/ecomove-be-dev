@@ -1,4 +1,5 @@
 import { db } from "../../drizzle/db.js";
+// import db from '../../lib/db.js';
 import { drivers } from "../../drizzle/schema.js";
 import { eq } from "drizzle-orm";
 import { randomUUID } from "crypto";
