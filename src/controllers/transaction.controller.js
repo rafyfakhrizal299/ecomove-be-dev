@@ -3,7 +3,8 @@ import * as trxService from "../services/transaction.service.js";
 export const createTransaction = async (req, res) => {
   try {
     const trx = await trxService.createTransaction(req.body);
-    res.status(201).json({ status: 201, message: "Transaction created", data: trx });
+    const fullData = await trxService.getTransactionById(trx.id);
+    res.status(201).json({ status: 201, message: "Transaction created", data: fullData  });
   } catch (err) {
     res.status(400).json({ status: 400, message: err.message });
   }
