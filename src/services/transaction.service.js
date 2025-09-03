@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from "uuid";
 import { db } from "../../drizzle/db.js";
 // import db from '../../lib/db.js';
-import { transactions, deliveryRates, savedAddresses, transactionReceivers } from "../../drizzle/schema.js";
+import { transactions, deliveryRates, savedAddresses, transactionReceivers, drivers  } from "../../drizzle/schema.js";
 import { eq, and, lte, gte, isNull, or, sql } from "drizzle-orm";
 
 export async function getRate(deliveryType, packageSize, distance) {
@@ -185,8 +185,9 @@ export async function createTransaction(data) {
           deliveryNotes: rc.deliveryNotes || null,
           distance: rc.distance,
           fee,
-          insurance: rc.insurance === true,
-          insuranceDetails: rc.insuranceDetails,
+          weight: rc.weight || null,
+          // insurance: rc.insurance === true,
+          // insuranceDetails: rc.insuranceDetails,
         });
       }
     }
@@ -206,11 +207,32 @@ export async function createTransaction(data) {
 }
 
 export async function getAllTransactions() {
-  return await db.select().from(transactions);
+  // return await db.select().from(transactions);
+  const rows = await db
+    .select({
+      transaction: transactions,
+      driver: drivers,
+    })
+    .from(transactions)
+    .leftJoin(drivers, eq(transactions.driverId, drivers.id));
+
+  return rows.map((row) => ({
+    ...row.transaction,
+    driver: row.driver || null,
+  }));
 }
 
 export async function getTransactionById(id) {
-  const [trx] = await db.select().from(transactions).where(eq(transactions.id, id));
+  // const [trx] = await db.select().from(transactions).where(eq(transactions.id, id));
+  const [trx] = await db
+    .select({
+      transaction: transactions,
+      driver: drivers,
+    })
+    .from(transactions)
+    .leftJoin(drivers, eq(transactions.driverId, drivers.id))
+    .where(eq(transactions.id, id));
+
   if (!trx) return null;
 
   const receivers = await db
@@ -218,7 +240,12 @@ export async function getTransactionById(id) {
     .from(transactionReceivers)
     .where(eq(transactionReceivers.transactionId, id));
 
-  return { ...trx, receivers };
+  // return { ...trx, receivers };
+  return {
+    ...trx.transaction,
+    driver: trx.driver || null,
+    receivers,
+  };
 }
 
 export async function updateTransaction(id, data) {
@@ -228,7 +255,8 @@ export async function updateTransaction(id, data) {
       .set({
         paymentStatus: data.paymentStatus,
         driverId: data.driverId,
-        modeOfPayment: data.modeOfPayment,
+        deliveryNotes: data.deliveryNotes,
+        status: data.status,
         updatedAt: new Date(),
       })
       .where(eq(transactions.id, id))
