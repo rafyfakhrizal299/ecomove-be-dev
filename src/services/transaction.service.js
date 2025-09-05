@@ -335,8 +335,12 @@ export async function getTransactions({ page = 1, limit = 10, filters = {} }) {
     .where(whereCondition);
 
   const dataQuery = db
-    .select()
+    .select({
+      transaction: transactions,
+      driver: drivers, // 👈 ambil data driver juga
+    })
     .from(transactions)
+    .leftJoin(drivers, eq(transactions.driverId, drivers.id))
     .where(whereCondition)
     .limit(limit)
     .offset(offset);
@@ -345,7 +349,10 @@ export async function getTransactions({ page = 1, limit = 10, filters = {} }) {
   const rows = await dataQuery;
 
   return {
-    data: rows,
+    data: rows.map(r => ({
+      ...r.transaction,
+      driver: r.driver, // 👈 embed detail driver
+    })),
     pagination: {
       page,
       limit,
