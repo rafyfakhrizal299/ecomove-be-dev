@@ -6,5 +6,6 @@ const router = express.Router()
 router.post('/create', createPayment);
 router.post('/notify', notifyPayment);
 router.post('/return', paymentReturn);
+router.get("/return", paymentReturn);
 
 export default router
