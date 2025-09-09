@@ -21,6 +21,9 @@ export const notifyPayment = async (req, res) => {
 
 export const paymentReturn = async (req, res) => {
   try {
+    // Ambil data baik dari GET query maupun POST body
+    const data = req.method === "POST" ? req.body : req.query;
+
     res.send(`
       <!DOCTYPE html>
       <html>
@@ -31,17 +34,15 @@ export const paymentReturn = async (req, res) => {
         <body style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;">
           <div style="text-align:center;">
             <h2>Pembayaran selesai 🎉</h2>
-            <p>Kamu bisa kembali ke aplikasi.</p>
+            <p>Status: ${data?.status ?? "unknown"}</p>
           </div>
           <script>
-            // kirim pesan ke React Native WebView
+            // kirim data balik ke React Native WebView
             if (window.ReactNativeWebView) {
-              window.ReactNativeWebView.postMessage("close-webview");
+              window.ReactNativeWebView.postMessage('${JSON.stringify(data)}');
             }
-            // fallback: auto close kalau di browser biasa
-            setTimeout(() => {
-              window.close();
-            }, 1500);
+            // fallback close
+            setTimeout(() => { window.close(); }, 1500);
           </script>
         </body>
       </html>
