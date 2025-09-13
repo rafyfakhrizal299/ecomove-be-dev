@@ -5,7 +5,8 @@ import {
   getTransactions,
   getTransactionById,
   updateTransaction,
-  deleteTransaction
+  deleteTransaction,
+  dashboardController
 } from "../controllers/transaction.controller.js";
 
 const router = express.Router();
@@ -13,6 +14,7 @@ const router = express.Router();
 router.post("/", createTransaction);
 router.get("/page", getTransactions); // ✅ sudah support pagination & filter
 router.get("/", getAllTransactions);
+router.get("/dashboard", dashboardController);
 router.get("/:id", getTransactionById);
 router.put("/:id", updateTransaction);
 router.delete("/:id", deleteTransaction);

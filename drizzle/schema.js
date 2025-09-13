@@ -60,46 +60,14 @@ export const savedAddresses = pgTable('saved_addresses', {
 // })
 )
 
-// export const transactions = pgTable('transactions', {
-//   id: serial('id').primaryKey(),
-//   userId: varchar('user_id', { length: 255 }).references(() => users.id).notNull(),
-
-//   senderAddressId: integer('sender_address_id').references(() => savedAddresses.id),
-
-//   address: text('address'),
-//   unitStreet: text('unit_street'),
-//   pinnedLocation: text('pinned_location'),
-//   contactName: text('contact_name'),
-//   contactNumber: text('contact_number'),
-//   contactEmail: varchar('contact_email'),
-
-//   pickupDate: date('pickup_date').notNull(),
-//   deliveryType: text('delivery_type').notNull(),
-//   packageSize: text('package_size').notNull(),
-//   distance: numeric('distance'),
-//   fee: numeric('fee'),
-//   bringPouch: boolean('bring_pouch').default(false),
-//   packageType: text('package_type').notNull(),
-//   cod: boolean('cod').default(false),
-//   itemProtection: boolean('item_protection').default(false),
-//   deliveryNotes: text('delivery_notes'),
-//   orderid: varchar('orderid', { length: 100 }), // from FIUU
-//   tranID: varchar('tranID', { length: 100 }), // from FIUU
-//   paymentStatus: text('payment_status').default('pending'),
-//   modeOfPayment: text('mode_of_payment').default('fiuuu'),
-//   driverId: varchar("driver_id", { length: 255 }).references(() => drivers.id), // FK ke drivers.id
-
-//   createdAt: timestamp('created_at', { mode: 'date' }).defaultNow(),
-//   updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow(),
-// })
-
 export const transactions = pgTable('transactions', {
   id: serial('id').primaryKey(),
   userId: varchar('user_id', { length: 255 }).references(() => users.id).notNull(),
 
   // Sender
   savedAddress: boolean('saved_address').default(false),
-  senderAddressId: integer('sender_address_id').references(() => savedAddresses.id),
+  addAddress: boolean('add_address').default(false),
+  senderAddressId: integer('sender_address_id'),
 
   address: text('address'),
   unitStreet: text('unit_street'),
@@ -136,6 +104,50 @@ export const deliveryRates = pgTable("delivery_rates", {
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
 });
 
+export const transactionReceivers = pgTable('transaction_receivers', {
+  id: serial('id').primaryKey(),
+  transactionId: integer('transaction_id').references(() => transactions.id).notNull(),
+
+  // Receiver
+  savedAddress: boolean('saved_address').default(false),
+  addAddress: boolean('add_address').default(false),
+  receiverAddressId: integer('receiver_address_id'),
+
+  address: text('address'),
+  unitStreet: text('unit_street'),
+  pinnedLocation: text('pinned_location'),
+  contactName: text('contact_name'),
+  contactNumber: text('contact_number'),
+  contactEmail: varchar('contact_email'),
+
+  // Detail
+  deliveryType: text('delivery_type').notNull(),
+  packageSize: text('package_size').notNull(),
+  distance: numeric('distance'),
+  fee: numeric('fee'),
+  bringPouch: boolean('bring_pouch').default(false),
+  itemType: text('item_type'),
+  packageType: text('package_type').notNull(),
+  cod: boolean('cod').default(false),
+  itemProtection: boolean('item_protection').default(false),
+  deliveryNotes: text('delivery_notes'),
+  weight: numeric('weight'), // in KG
+
+  createdAt: timestamp('created_at', { mode: 'date' }).defaultNow(),
+  updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow(),
+})
+
+export const drivers = pgTable("drivers", {
+  id: varchar('id', { length: 255 }).primaryKey().notNull(), // UUID
+  name: varchar("name", { length: 255 }).notNull(),
+  phoneNumber: varchar("phone_number", { length: 20 }).notNull(),
+  email: varchar("email", { length: 255 }),
+  licenseNumber: varchar("license_number", { length: 100 }),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
+});
+
 // export const transactionReceivers = pgTable('transaction_receivers', {
 //   id: serial('id').primaryKey(),
 //   transactionId: integer('transaction_id').references(() => transactions.id).notNull(),
@@ -158,44 +170,35 @@ export const deliveryRates = pgTable("delivery_rates", {
 //   updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow(),
 // })
 
-export const transactionReceivers = pgTable('transaction_receivers', {
-  id: serial('id').primaryKey(),
-  transactionId: integer('transaction_id').references(() => transactions.id).notNull(),
+// export const transactions = pgTable('transactions', {
+//   id: serial('id').primaryKey(),
+//   userId: varchar('user_id', { length: 255 }).references(() => users.id).notNull(),
 
-  // Receiver
-  savedAddress: boolean('saved_address').default(false),
-  receiverAddressId: integer('receiver_address_id').references(() => savedAddresses.id),
+//   senderAddressId: integer('sender_address_id').references(() => savedAddresses.id),
 
-  address: text('address'),
-  unitStreet: text('unit_street'),
-  pinnedLocation: text('pinned_location'),
-  contactName: text('contact_name'),
-  contactNumber: text('contact_number'),
-  contactEmail: varchar('contact_email'),
+//   address: text('address'),
+//   unitStreet: text('unit_street'),
+//   pinnedLocation: text('pinned_location'),
+//   contactName: text('contact_name'),
+//   contactNumber: text('contact_number'),
+//   contactEmail: varchar('contact_email'),
 
-  // Detail
-  deliveryType: text('delivery_type').notNull(),
-  packageSize: text('package_size').notNull(),
-  distance: numeric('distance'),
-  fee: numeric('fee'),
-  bringPouch: boolean('bring_pouch').default(false),
-  packageType: text('package_type').notNull(),
-  cod: boolean('cod').default(false),
-  itemProtection: boolean('item_protection').default(false),
-  deliveryNotes: text('delivery_notes'),
-  weight: numeric('weight'), // in KG
+//   pickupDate: date('pickup_date').notNull(),
+//   deliveryType: text('delivery_type').notNull(),
+//   packageSize: text('package_size').notNull(),
+//   distance: numeric('distance'),
+//   fee: numeric('fee'),
+//   bringPouch: boolean('bring_pouch').default(false),
+//   packageType: text('package_type').notNull(),
+//   cod: boolean('cod').default(false),
+//   itemProtection: boolean('item_protection').default(false),
+//   deliveryNotes: text('delivery_notes'),
+//   orderid: varchar('orderid', { length: 100 }), // from FIUU
+//   tranID: varchar('tranID', { length: 100 }), // from FIUU
+//   paymentStatus: text('payment_status').default('pending'),
+//   modeOfPayment: text('mode_of_payment').default('fiuuu'),
+//   driverId: varchar("driver_id", { length: 255 }).references(() => drivers.id), // FK ke drivers.id
 
-  createdAt: timestamp('created_at', { mode: 'date' }).defaultNow(),
-  updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow(),
-})
-
-export const drivers = pgTable("drivers", {
-  id: varchar('id', { length: 255 }).primaryKey().notNull(), // UUID
-  name: varchar("name", { length: 255 }).notNull(),
-  phoneNumber: varchar("phone_number", { length: 20 }).notNull(),
-  email: varchar("email", { length: 255 }),
-  licenseNumber: varchar("license_number", { length: 100 }),
-  isActive: boolean("is_active").default(true),
-  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
-  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
-});
+//   createdAt: timestamp('created_at', { mode: 'date' }).defaultNow(),
+//   updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow(),
+// })
