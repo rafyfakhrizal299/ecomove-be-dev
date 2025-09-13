@@ -2,7 +2,123 @@ import { v4 as uuidv4 } from "uuid";
 import { db } from "../../drizzle/db.js";
 // import db from '../../lib/db.js';
 import { transactions, deliveryRates, savedAddresses, transactionReceivers, drivers  } from "../../drizzle/schema.js";
-import { eq, and, lte, gte, isNull, or, sql } from "drizzle-orm";
+import { eq, and, lte, gte, isNull, or, sql, count, sum } from "drizzle-orm";
+
+//--------------------------------------------------------------------------------------------------------------------
+// 🔹 Summary
+export async function getTransactionSummary() {
+  const [summary] = await db
+    .select({
+      totalDelivery: count().as("totalDelivery"),
+      totalUser: sql`COUNT(DISTINCT ${transactions.userId})`.as("totalUser"),
+      totalRevenue: sum(transactions.totalFee).mapWith(Number).as("totalRevenue"),
+    })
+    .from(transactions)
+    .where(eq(transactions.status, "delivered"));
+
+  return {
+    totalDelivery: Number(summary?.totalDelivery ?? 0),
+    totalUser: Number(summary?.totalUser ?? 0),
+    totalRevenue: Number(summary?.totalRevenue ?? 0),
+  };
+}
+
+// 🔹 Yearly Chart
+export async function getYearlyChart() {
+  const result = await db
+    .select({
+      year: sql`EXTRACT(YEAR FROM ${transactions.createdAt})`.as("year"),
+      delivery: count().as("delivery"),
+      revenue: sum(transactions.totalFee).mapWith(Number).as("revenue"),
+    })
+    .from(transactions)
+    .where(eq(transactions.status, "delivered"))
+    .groupBy(sql`year`)
+    .orderBy(sql`year`);
+
+  return result.map(r => ({
+    name: String(r.year),
+    delivery: Number(r.delivery),
+    revenue: Number(r.revenue),
+  }));
+}
+
+// 🔹 Monthly Chart
+export async function getMonthlyChart() {
+  const result = await db
+    .select({
+      month: sql`TO_CHAR(${transactions.createdAt}, 'Mon')`.as("month"),
+      delivery: count().as("delivery"),
+      revenue: sum(transactions.totalFee).mapWith(Number).as("revenue"),
+      monthOrder: sql`EXTRACT(MONTH FROM ${transactions.createdAt})`.as("monthOrder"),
+    })
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.status, "delivered"),
+        sql`EXTRACT(YEAR FROM ${transactions.createdAt}) = EXTRACT(YEAR FROM CURRENT_DATE)`
+      )
+    )
+    .groupBy(
+      sql`TO_CHAR(${transactions.createdAt}, 'Mon')`,
+      sql`EXTRACT(MONTH FROM ${transactions.createdAt})`
+    )
+    .orderBy(sql`EXTRACT(MONTH FROM ${transactions.createdAt})`);
+
+  return result.map(r => ({
+    name: r.month,
+    delivery: Number(r.delivery),
+    revenue: Number(r.revenue),
+  }));
+}
+
+
+// 🔹 Weekly Chart
+export async function getWeeklyChart() {
+  const result = await db
+    .select({
+      day: sql`TO_CHAR(${transactions.createdAt}, 'Dy')`.as("day"),
+      delivery: count().as("delivery"),
+      revenue: sum(transactions.totalFee).mapWith(Number).as("revenue"),
+      dow: sql`EXTRACT(DOW FROM ${transactions.createdAt})`.as("dow"),
+    })
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.status, "delivered"),
+        sql`${transactions.createdAt} >= NOW() - INTERVAL '7 days'`
+      )
+    )
+    .groupBy(sql`TO_CHAR(${transactions.createdAt}, 'Dy')`, sql`EXTRACT(DOW FROM ${transactions.createdAt})`)
+    .orderBy(sql`EXTRACT(DOW FROM ${transactions.createdAt})`);
+
+  return result.map(r => ({
+    name: r.day,
+    delivery: Number(r.delivery),
+    revenue: Number(r.revenue),
+  }));
+}
+
+
+// 🔹 Dashboard data
+export async function getDashboardData() {
+  const [summary, yearly, monthly, weekly] = await Promise.all([
+    getTransactionSummary(),
+    getYearlyChart(),
+    getMonthlyChart(),
+    getWeeklyChart(),
+  ]);
+
+  return {
+    transactionSummary: summary,
+    charts: {
+      yearly,
+      monthly,
+      weekly,
+    },
+  };
+}
+// --------------------------------------------------------------------------------------------------------------------
 
 export async function getRate(deliveryType, packageSize, distance) {
   const rows = await db
@@ -23,176 +139,158 @@ export async function getRate(deliveryType, packageSize, distance) {
   return rows[0] || null;
 }
 
+function normalizePinnedLocation(val) {
+  if (!val) return null;
+  if (typeof val === "object" && "x" in val && "y" in val) {
+    return `${val.x},${val.y}`;
+  }
+  return String(val);
+}
+
 export async function createTransaction(data) {
   try {
     let senderAddressId = data.senderAddressId || null;
     let senderData = {};
 
+    // === SENDER ===
     if (data.savedAddressSender) {
-      // ✅ ambil dari saved_addresses
       const [savedSender] = await db
         .select()
         .from(savedAddresses)
         .where(eq(savedAddresses.id, senderAddressId));
 
       if (!savedSender) throw new Error("Sender address not found");
-      senderData = savedSender;
-    } else {
-      // ✅ cek dulu apakah sender sudah ada di saved_addresses
-      const [existingSender] = await db
-        .select()
-        .from(savedAddresses)
-        .where(
-          and(
-            eq(savedAddresses.userId, data.userId),
-            eq(savedAddresses.pinnedLocation, data.pinnedLocation),
-            eq(savedAddresses.contactName, data.contactName),
-            eq(savedAddresses.contactNumber, data.contactNumber),
-            eq(savedAddresses.type, "sender")
-          )
-        );
 
-      if (existingSender) {
-        senderAddressId = existingSender.id;
-        senderData = existingSender;
-      } else {
+      senderData = {
+        address: savedSender.address,
+        unitStreet: savedSender.unitStreet,
+        pinnedLocation: normalizePinnedLocation(savedSender.pinnedLocation),
+        contactName: savedSender.contactName,
+        contactNumber: savedSender.contactNumber,
+        contactEmail: savedSender.contactEmail,
+      };
+    } else {
+      senderData = {
+        address: data.address,
+        unitStreet: data.unitStreet,
+        pinnedLocation: normalizePinnedLocation(data.pinnedLocation),
+        contactName: data.contactName,
+        contactNumber: data.contactNumber,
+        contactEmail: data.contactEmail,
+      };
+
+      if (data.addAddress) {
         const [newSenderAddr] = await db
           .insert(savedAddresses)
           .values({
             userId: data.userId,
             label: data.label || "Sender Address",
-            address: data.address,
-            unitStreet: data.unitStreet,
-            pinnedLocation: data.pinnedLocation,
-            contactName: data.contactName,
-            contactNumber: data.contactNumber,
-            contactEmail: data.contactEmail,
+            ...senderData,
             type: "sender",
           })
           .returning();
 
         senderAddressId = newSenderAddr.id;
-        senderData = newSenderAddr;
       }
     }
 
-    // generate tranID
-    // const tranID = uuidv4();
-    const pickupTime = new Date(data.pickupTime)
+    const pickupTime = new Date(data.pickupTime);
 
-    // ✅ simpan transaksi dengan data sender
+    // === TRANSACTION ===
     const [trx] = await db
       .insert(transactions)
       .values({
         userId: data.userId,
         senderAddressId,
-        address: senderData.address,
-        unitStreet: senderData.unitStreet,
-        pinnedLocation: senderData.pinnedLocation,
-        contactName: senderData.contactName,
-        contactNumber: senderData.contactNumber,
-        contactEmail: senderData.contactEmail,
+        ...senderData,
         pickupTime,
         deliveryNotes: data.deliveryNotes || null,
-        orderid: null, // 🚫 jangan dari payload
-        // tranID,
+        orderid: null,
         paymentStatus: "pending",
         modeOfPayment: data.modeOfPayment || "fiuuu",
+        addAddress: data.addAddress ?? false,
       })
       .returning();
 
-    // Receivers
+    // === RECEIVERS ===
     let totalFee = 0;
     let totalDistance = 0;
 
-    if (data.receivers && Array.isArray(data.receivers)) {
+    if (Array.isArray(data.receivers)) {
       for (const rc of data.receivers) {
         let receiverAddressId = rc.receiverAddressId || null;
         let receiverData = {};
 
         if (rc.savedAddress) {
-          // ✅ fetch receiver dari saved_addresses
           const [savedReceiver] = await db
             .select()
             .from(savedAddresses)
             .where(eq(savedAddresses.id, receiverAddressId));
 
           if (!savedReceiver) throw new Error("Receiver address not found");
-          receiverData = savedReceiver;
-        } else {
-          // ✅ cek dulu apakah udah ada di saved_addresses
-          const [existingAddr] = await db
-            .select()
-            .from(savedAddresses)
-            .where(
-              and(
-                eq(savedAddresses.userId, data.userId),
-                eq(savedAddresses.pinnedLocation, rc.pinnedLocation),
-                eq(savedAddresses.contactName, rc.contactName),
-                eq(savedAddresses.contactNumber, rc.contactNumber),
-                eq(savedAddresses.type, "receiver")
-              )
-            );
 
-          if (existingAddr) {
-            receiverAddressId = existingAddr.id;
-            receiverData = existingAddr;
-          } else {
+          receiverData = {
+            address: savedReceiver.address,
+            unitStreet: savedReceiver.unitStreet,
+            pinnedLocation: normalizePinnedLocation(savedReceiver.pinnedLocation),
+            contactName: savedReceiver.contactName,
+            contactNumber: savedReceiver.contactNumber,
+            contactEmail: savedReceiver.contactEmail,
+            label: savedReceiver.label,
+          };
+        } else {
+          receiverData = {
+            address: rc.address,
+            unitStreet: rc.unitStreet,
+            pinnedLocation: normalizePinnedLocation(rc.pinnedLocation),
+            contactName: rc.contactName,
+            contactNumber: rc.contactNumber,
+            contactEmail: rc.contactEmail,
+            label: rc.label,
+          };
+
+          if (rc.addAddress) {
             const [newReceiverAddr] = await db
               .insert(savedAddresses)
               .values({
                 userId: data.userId,
                 label: rc.label || "Receiver Address",
-                address: rc.address,
-                unitStreet: rc.unitStreet,
-                pinnedLocation: rc.pinnedLocation,
-                contactName: rc.contactName,
-                contactNumber: rc.contactNumber,
-                contactEmail: rc.contactEmail,
+                ...receiverData,
                 type: "receiver",
               })
               .returning();
 
             receiverAddressId = newReceiverAddr.id;
-            receiverData = newReceiverAddr;
           }
         }
 
-        // ✅ hitung rate
         const rate = await getRate(rc.deliveryType, rc.packageSize, rc.distance);
         const fee = rate ? rate.price : 0;
 
         totalFee += fee;
         totalDistance += rc.distance;
 
-        // ✅ simpan receiver transaction
         await db.insert(transactionReceivers).values({
           transactionId: trx.id,
           receiverAddressId,
-          address: receiverData.address,
-          unitStreet: receiverData.unitStreet,
-          pinnedLocation: receiverData.pinnedLocation,
-          contactName: receiverData.contactName,
-          contactNumber: receiverData.contactNumber,
-          contactEmail: receiverData.contactEmail,
-          label: rc.label || receiverData.label,
+          ...receiverData,
           deliveryType: rc.deliveryType,
           packageSize: rc.packageSize,
           itemType: rc.itemType,
+          bringPouch: rc.bringPouch ?? false,
           packageType: rc.packageType || "standard",
           cod: rc.cod || false,
-          itemProtection: rc.itemProtection || false,
+          itemProtection: rc.itemProtection ?? false,
           deliveryNotes: rc.deliveryNotes || null,
           distance: rc.distance,
           fee,
           weight: rc.weight || null,
-          // insurance: rc.insurance === true,
-          // insuranceDetails: rc.insuranceDetails,
+          addAddress: rc.addAddress ?? false,
         });
       }
     }
 
-    // update total fee & distance
+    // === UPDATE TOTAL ===
     const [updatedTrx] = await db
       .update(transactions)
       .set({ totalFee, totalDistance })
@@ -282,7 +380,7 @@ export async function updateTransaction(id, data) {
           receiverAddressId: receiver.receiverAddressId || null,
           address: receiver.address,
           unitStreet: receiver.unitStreet,
-          pinnedLocation: receiver.pinnedLocation,
+          pinnedLocation: String(receiver.pinnedLocation),
           contactName: receiver.contactName,
           contactNumber: receiver.contactNumber,
           contactEmail: receiver.contactEmail,
@@ -290,6 +388,7 @@ export async function updateTransaction(id, data) {
           deliveryType: receiver.deliveryType,
           packageSize: receiver.packageSize, // ✅ fix
           itemType: receiver.itemType,
+          bringPouch: receiver.bringPouch || false,
           packageType: receiver.packageType || "standard",
           cod: receiver.cod || false,
           itemProtection: receiver.itemProtection || false,

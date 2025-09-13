@@ -1,5 +1,21 @@
 import * as trxService from "../services/transaction.service.js";
 
+export async function dashboardController(req, res) {
+  try {
+    const data = await trxService.getDashboardData();
+    res.status(200).json({
+      status: 200,
+      data,
+    });
+  } catch (err) {
+    console.error("🔥 Dashboard error:", err);
+    res.status(500).json({
+      status: 500,
+      message: "Internal server error",
+    });
+  }
+}
+
 export const createTransaction = async (req, res) => {
   try {
     const trx = await trxService.createTransaction(req.body);
