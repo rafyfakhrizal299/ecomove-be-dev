@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from "uuid";
 import { db } from "../../drizzle/db.js";
 // import db from '../../lib/db.js';
-import { transactions, deliveryRates, savedAddresses, transactionReceivers, drivers  } from "../../drizzle/schema.js";
+import { transactions, deliveryRates, savedAddresses, transactionReceivers, drivers, userFcmTokens} from "../../drizzle/schema.js";
 import { eq, and, lte, gte, isNull, or, sql, count, sum } from "drizzle-orm";
 
 //--------------------------------------------------------------------------------------------------------------------
@@ -14,7 +14,7 @@ export async function getTransactionSummary() {
       totalRevenue: sum(transactions.totalFee).mapWith(Number).as("totalRevenue"),
     })
     .from(transactions)
-    .where(eq(transactions.status, "delivered"));
+    .where(eq(transactions.status, "Delivered"));
 
   return {
     totalDelivery: Number(summary?.totalDelivery ?? 0),
@@ -32,7 +32,7 @@ export async function getYearlyChart() {
       revenue: sum(transactions.totalFee).mapWith(Number).as("revenue"),
     })
     .from(transactions)
-    .where(eq(transactions.status, "delivered"))
+    .where(eq(transactions.status, "Delivered"))
     .groupBy(sql`year`)
     .orderBy(sql`year`);
 
@@ -55,7 +55,7 @@ export async function getMonthlyChart() {
     .from(transactions)
     .where(
       and(
-        eq(transactions.status, "delivered"),
+        eq(transactions.status, "Delivered"),
         sql`EXTRACT(YEAR FROM ${transactions.createdAt}) = EXTRACT(YEAR FROM CURRENT_DATE)`
       )
     )
@@ -85,7 +85,7 @@ export async function getWeeklyChart() {
     .from(transactions)
     .where(
       and(
-        eq(transactions.status, "delivered"),
+        eq(transactions.status, "Delivered"),
         sql`${transactions.createdAt} >= NOW() - INTERVAL '7 days'`
       )
     )
@@ -409,6 +409,35 @@ export async function updateTransaction(id, data) {
     return updated;
   });
 
+  if (trx) {
+    // ✅ Ambil token user
+    const tokens = await db
+      .select()
+      .from(userFcmTokens)
+      .where(eq(userFcmTokens.userId, trx.userId));
+
+    if (tokens.length > 0) {
+      const messages = tokens.map((t) => ({
+        token: t.token,
+        notification: {
+          title: "📦 Transaction Update",
+          body: `Your order #${trx.id} is now ${trx.status}`,
+        },
+        data: {
+          transactionId: trx.id.toString(),
+          status: trx.status,
+        },
+      }));
+
+      try {
+        await Promise.all(messages.map((m) => fcm.send(m)));
+        console.log("✅ Push notification sent!");
+      } catch (err) {
+        console.error("❌ Failed to send push notification:", err);
+      }
+    }
+  }
+
   return trx;
 }
 
@@ -418,8 +447,9 @@ export async function deleteTransaction(id) {
 }
 
 export async function getTransactions({ page = 1, limit = 10, filters = {} }) {
-  const offset = (page - 1) * limit;
   const conditions = [];
+  page = Number(page);
+  limit = Number(limit);
 
   if (filters.paymentStatus) conditions.push(eq(transactions.paymentStatus, filters.paymentStatus));
   if (filters.userId) conditions.push(eq(transactions.userId, filters.userId));
@@ -427,7 +457,40 @@ export async function getTransactions({ page = 1, limit = 10, filters = {} }) {
   let whereCondition = undefined;
   if (conditions.length === 1) whereCondition = conditions[0];
   else if (conditions.length > 1) whereCondition = and(...conditions);
+  // ------------- HISTORY TRANSACTION BY USER -------------
+  if (page === 0 && limit === 0) {
+    const totalQuery = db
+      .select({ count: sql`count(*)` })
+      .from(transactions)
+      .where(whereCondition);
 
+    const dataQuery = db
+      .select({
+        transaction: transactions,
+        driver: drivers,
+      })
+      .from(transactions)
+      .leftJoin(drivers, eq(transactions.driverId, drivers.id))
+      .where(whereCondition);
+
+    const [{ count }] = await totalQuery;
+    const rows = await dataQuery;
+
+    return {
+      data: rows.map(r => ({
+        ...r.transaction,
+        driver: r.driver,
+      })),
+      pagination: {
+        page: 1,
+        limit: Number(count),
+        total: Number(count),
+        totalPages: 1,
+      },
+    };
+  }
+  // ------------- DEFAULT CONDITION -------------
+  const offset = (page - 1) * limit;
   const totalQuery = db
     .select({ count: sql`count(*)` })
     .from(transactions)
