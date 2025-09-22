@@ -96,11 +96,11 @@ export const transactions = pgTable('transactions', {
 
 export const deliveryRates = pgTable("delivery_rates", {
   id: serial("id").primaryKey(),
-  deliveryType: text("delivery_type").notNull(), // "same-day" | "standard"
-  packageSize: text("package_size").notNull(), // "small" | "large"
+  deliveryType: text("delivery_type").notNull(),  // "same-day" | "standard"
+  packageSize: text("package_size").notNull(),    // "small" | "large"
   minDistance: integer("min_distance").notNull(), // dalam M
-  maxDistance: integer("max_distance"),          // nullable kalau jarak terakhir >10KM
-  price: integer("price").notNull(),             // harga dalam Peso
+  maxDistance: integer("max_distance"),           // nullable kalau jarak terakhir >10KM
+  price: integer("price").notNull(),              // harga dalam Peso
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
 });
 
@@ -147,6 +147,14 @@ export const drivers = pgTable("drivers", {
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
 });
+
+export const userFcmTokens = pgTable("user_fcm_tokens", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id", { length: 255 }).notNull(),
+  token: text("token").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 
 // export const transactionReceivers = pgTable('transaction_receivers', {
 //   id: serial('id').primaryKey(),
