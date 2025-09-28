@@ -26,6 +26,10 @@ export const users = pgTable('User', {
   canAccessCMS: boolean('canAccessCMS').default(false).notNull(),
   createdAt: timestamp('createdAt', { mode: 'date' }).defaultNow(),
   updatedAt: timestamp('updatedAt', { mode: 'date' }).defaultNow(),
+  // --- tambahan buat verifikasi ---
+  isEmailVerified: boolean("is_email_verified").default(false).notNull(),
+  verificationToken: varchar("verification_token", { length: 255 }),
+  verificationTokenExpiry: timestamp("verification_token_expiry"),
 })
 
 export const userServices = pgTable('UserService', {

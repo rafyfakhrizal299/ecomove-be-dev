@@ -1,18 +1,61 @@
-import bcrypt from 'bcrypt'
-import jwt from 'jsonwebtoken'
-import { OAuth2Client } from 'google-auth-library'
-import jwksClient from 'jwks-rsa'
-import dotenv from 'dotenv'
-import db from '../../lib/db.js'
-import { v4 as uuidv4 } from 'uuid'
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
+import { OAuth2Client } from 'google-auth-library';
+import jwksClient from 'jwks-rsa';
+import dotenv from 'dotenv';
+import db from '../../lib/db.js';
+import { v4 as uuidv4 } from 'uuid';
 import { and, ilike, eq, count, or, inArray } from 'drizzle-orm';
+import { users, services, userServices } from '../../drizzle/schema.js';
+import { sendVerificationEmail } from "../services/email.service.js";
+import { randomBytes } from "crypto";
+dotenv.config();
 
-import { users, services, userServices } from '../../drizzle/schema.js'
-
-const googleClient = new OAuth2Client()
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
 const appleJwks = jwksClient({ jwksUri: 'https://appleid.apple.com/auth/keys' })
-
 const TOKEN_EXPIRES_IN = '7d'
+
+export const requestEmailVerification = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    const token = randomBytes(32).toString("hex");
+
+    // save token ke user row
+    await db.update(users).set({ verificationToken: token }).where(eq(users.email, email));
+
+    await sendVerificationEmail(email, token);
+
+    res.json({ status: 200, message: "Verification email sent" });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to send email", error: err.message });
+  }
+};
+
+export const verifyEmail = async (req, res) => {
+  try {
+    const { token } = req.params;
+
+    const result = await db
+      .select()
+      .from(users)
+      .where(eq(users.verificationToken, token));
+
+    if (!result.length) {
+      return res.status(400).json({ message: "Invalid token" });
+    }
+
+    const user = result[0];
+
+    await db.update(users)
+      .set({ isVerified: true, verificationToken: null })
+      .where(eq(users.id, user.id));
+
+    res.json({ status: 200, message: "Email verified successfully" });
+  } catch (err) {
+    res.status(500).json({ message: "Verification failed", error: err.message });
+  }
+};
 
 function generateToken(user) {
   const JWT_SECRET = process.env.JWT_SECRET
@@ -72,6 +115,7 @@ export const oauthLogin = async (req, res) => {
         audience: process.env.GOOGLE_CLIENT_ID
       })
       const payload = ticket.getPayload()
+      console.log(payload)
 
       const { sub, email, given_name, family_name } = payload
 
@@ -79,6 +123,7 @@ export const oauthLogin = async (req, res) => {
 
       if (!user) {
         const insertResult = await db.insert(users).values({
+          id: uuidv4(),
           firstName: given_name,
           lastName: family_name || '',
           email,
