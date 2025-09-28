@@ -9,12 +9,14 @@
     "start": "node index.js",
     "dev": "nodemon index.js",
     "seed": "node drizzle/seeder/service-seeder.js",
-    "vercel-build": "echo 'No build needed'"
+    "vercel-build": "echo 'No build needed'",
+    "migrate": "npx drizzle-kit push --config=drizzle.config.mjs"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "axios": "^1.12.2",
     "bcrypt": "^6.0.0",
     "body-parser": "^2.2.0",
     "cors": "^2.8.5",
@@ -26,7 +28,7 @@
     "exceljs": "^4.4.0",
     "express": "^5.1.0",
     "firebase-admin": "^13.5.0",
-    "google-auth-library": "^10.1.0",
+    "google-auth-library": "^10.3.0",
     "jsonwebtoken": "^9.0.2",
     "jwks-rsa": "^3.2.0",
     "pg": "^8.16.3",
