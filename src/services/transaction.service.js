@@ -3,6 +3,7 @@ import { db } from "../../drizzle/db.js";
 // import db from '../../lib/db.js';
 import { transactions, deliveryRates, savedAddresses, transactionReceivers, drivers, userFcmTokens} from "../../drizzle/schema.js";
 import { eq, and, lte, gte, isNull, or, sql, count, sum } from "drizzle-orm";
+import { messagingService } from '../utils/fcmIntegration.js';
 
 import admin from '../utils/fcmIntegration.js';
 //--------------------------------------------------------------------------------------------------------------------
@@ -444,7 +445,7 @@ export async function updateTransaction(id, data) {
           };
 
           try {
-              const messaging = admin.messaging();
+              const messaging = messagingService(); 
 
               // Panggil sendMulticast dengan struktur yang benar
               const response = await messaging.sendMulticast({

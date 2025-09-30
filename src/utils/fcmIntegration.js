@@ -1,4 +1,5 @@
 import admin from "firebase-admin";
+import { getMessaging } from 'firebase-admin/messaging';
 import dotenv from 'dotenv'
 dotenv.config()
 
@@ -18,5 +19,5 @@ if (!admin.apps.length) {
         console.warn("⚠️ WARNING: FIREBASE_SERVICE_ACCOUNT is not set. FCM will fail.");
     }
 }
-
+export const messagingService = () => getMessaging(admin.app());
 export default admin;
