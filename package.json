@@ -9,7 +9,7 @@
     "start": "node index.js",
     "dev": "nodemon index.js",
     "seed": "node drizzle/seeder/service-seeder.js",
-    "vercel-build": "echo 'No build needed'",
+    "vercel-build": "npm install && node index.js",
     "migrate": "npx drizzle-kit push --config=drizzle.config.mjs"
   },
   "keywords": [],

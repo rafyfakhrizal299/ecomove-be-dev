@@ -3,8 +3,8 @@ import { db } from "../../drizzle/db.js";
 // import db from '../../lib/db.js';
 import { transactions, deliveryRates, savedAddresses, transactionReceivers, drivers, userFcmTokens} from "../../drizzle/schema.js";
 import { eq, and, lte, gte, isNull, or, sql, count, sum } from "drizzle-orm";
-import { fcm } from "../utils/fcmIntegration.js";
 
+import { getFirebaseMessagingService } from '../utils/fcmIntegration.js'; 
 //--------------------------------------------------------------------------------------------------------------------
 // 🔹 Summary
 export async function getTransactionSummary() {
@@ -414,30 +414,55 @@ export async function updateTransaction(id, data) {
     return updatedTrx;
   });
   let notif = null
-  if (trx) {
-    const tokens = await db.select().from(userFcmTokens).where(eq(userFcmTokens.userId, trx[0].userId));
-    notif = tokens
-    if (tokens.length > 0) {
-      const messages = tokens.map((t) => ({
-        token: t.token,
-        notification: {
-          title: "📦 Transaction Update",
-          body: `Your order #${trx[0].id} is now ${trx[0].status}`,
-        },
-        data: {
-          transactionId: trx[0].id.toString(),
-          status: trx[0].status,
-        },
-      }));
+ const transactionObject = trx && trx.length > 0 ? trx[0] : null;
 
-      try {
-        await fcm.sendAll(messages);
-        console.log("✅ Push notification sent!");
-      } catch (err) {
-        console.error("❌ Failed to send push notification:", err);
+    // --- 3. Logika Push Notification FCM ---
+    if (transactionObject) {
+      // Ambil semua token FCM untuk user ini
+      const tokens = await db.select()
+          .from(userFcmTokens)
+          .where(eq(userFcmTokens.userId, transactionObject.userId));
+
+      // 🚨 Filter dan Validasi Token (Solusi error: Exactly one of topic, token or condition is required)
+      const registrationTokens = tokens
+          .map((t) => t.token)
+          .filter(token => token && token.length > 0); 
+
+      notif = tokens;
+
+      if (registrationTokens.length > 0) {
+          const payload = {
+              notification: {
+                  title: "📦 Transaction Update",
+                  body: `Your order #${transactionObject.id} is now ${transactionObject.status}`,
+              },
+              data: {
+                  // FCM data payload harus berupa string
+                  transactionId: String(transactionObject.id), 
+                  status: transactionObject.status,
+              },
+          };
+
+          try {
+              const messaging = getFirebaseMessagingService(); 
+
+              // Panggil sendMulticast dengan struktur yang benar
+              const response = await messaging.sendEachForMulticast({
+                  tokens: registrationTokens, 
+                  notification: payload.notification,
+                  data: payload.data,
+              });
+
+              console.log(`✅ Push notification sent successfully to ${response.successCount} devices.`);
+              console.log('FCM Multicast Response:', response);
+
+          } catch (err) {
+              console.error("❌ Failed to send push notification:", err);
+          }
+      } else {
+            console.log(`⚠️ Skipping notification: No valid FCM tokens found for user ${transactionObject.userId}.`);
       }
     }
-  }
 
   return {
     transaction: trx,
