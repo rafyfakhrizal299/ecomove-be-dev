@@ -414,25 +414,43 @@ export async function updateTransaction(id, data) {
     return updatedTrx;
   });
   let notif = null
-  if (trx) {
-    const tokens = await db.select().from(userFcmTokens).where(eq(userFcmTokens.userId, trx[0].userId));
-    notif = tokens
+  const transactionObject = trx && trx.length > 0 ? trx[0] : null;
+
+  if (transactionObject) {
+    const tokens = await db.select()
+      .from(userFcmTokens)
+      .where(eq(userFcmTokens.userId, transactionObject.userId));
+    
+    notif = tokens;
+    
     if (tokens.length > 0) {
-      const messages = tokens.map((t) => ({
-        token: t.token,
+      // Ekstrak hanya token pendaftaran dari array hasil query
+      const registrationTokens = tokens.map((t) => t.token);
+
+      const payload = {
+        // Pesan yang akan ditampilkan di perangkat
         notification: {
           title: "📦 Transaction Update",
-          body: `Your order #${trx[0].id} is now ${trx[0].status}`,
+          body: `Your order #${transactionObject.id} is now ${transactionObject.status}`,
         },
+        // Data kustom untuk dibaca aplikasi
         data: {
-          transactionId: trx[0].id.toString(),
-          status: trx[0].status,
+          transactionId: transactionObject.id.toString(),
+          status: transactionObject.status,
         },
-      }));
+      };
 
       try {
-        await fcm.sendAll(messages);
-        console.log("✅ Push notification sent!");
+        // Menggunakan sendMulticast yang lebih robust
+        const response = await fcm.sendMulticast({
+          tokens: registrationTokens, // Array of tokens
+          ...payload, // Payload notifikasi dan data
+        });
+        
+        console.log("✅ Push notification sent successfully!");
+        // Log respons untuk debugging (misalnya melihat token mana yang gagal)
+        console.log('FCM Multicast Response:', response); 
+
       } catch (err) {
         console.error("❌ Failed to send push notification:", err);
       }
