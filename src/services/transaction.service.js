@@ -3,6 +3,7 @@ import { db } from "../../drizzle/db.js";
 // import db from '../../lib/db.js';
 import { transactions, deliveryRates, savedAddresses, transactionReceivers, drivers, userFcmTokens} from "../../drizzle/schema.js";
 import { eq, and, lte, gte, isNull, or, sql, count, sum } from "drizzle-orm";
+import { fcm } from "../utils/fcmIntegration.js";
 
 //--------------------------------------------------------------------------------------------------------------------
 // 🔹 Summary
@@ -348,7 +349,7 @@ export async function getTransactionById(id) {
 
 export async function updateTransaction(id, data) {
   const trx = await db.transaction(async (tx) => {
-    const [updated] = await tx
+    await tx
       .update(transactions)
       .set({
         paymentStatus: data.paymentStatus,
@@ -357,10 +358,15 @@ export async function updateTransaction(id, data) {
         status: data.status,
         updatedAt: new Date(),
       })
-      .where(eq(transactions.id, id))
-      .returning();
+      .where(eq(transactions.id, id));
 
-    if (!updated) return null;
+    const updatedTrx = await tx
+      .select()
+      .from(transactions)
+      .where(eq(transactions.id, id))
+      .get();
+
+    if (!updatedTrx) return null;
 
     let totalFee = 0;
     let totalDistance = 0;
@@ -380,13 +386,13 @@ export async function updateTransaction(id, data) {
           receiverAddressId: receiver.receiverAddressId || null,
           address: receiver.address,
           unitStreet: receiver.unitStreet,
-          pinnedLocation: String(receiver.pinnedLocation),
+          pinnedLocation: receiver.pinnedLocation ? String(receiver.pinnedLocation) : null,
           contactName: receiver.contactName,
           contactNumber: receiver.contactNumber,
           contactEmail: receiver.contactEmail,
           label: receiver.label,
           deliveryType: receiver.deliveryType,
-          packageSize: receiver.packageSize, // ✅ fix
+          packageSize: receiver.packageSize,
           itemType: receiver.itemType,
           bringPouch: receiver.bringPouch || false,
           packageType: receiver.packageType || "standard",
@@ -406,11 +412,10 @@ export async function updateTransaction(id, data) {
         .where(eq(transactions.id, id));
     }
 
-    return updated;
+    return updatedTrx;
   });
 
   if (trx) {
-    // ✅ Ambil token user
     const tokens = await db
       .select()
       .from(userFcmTokens)
@@ -430,7 +435,7 @@ export async function updateTransaction(id, data) {
       }));
 
       try {
-        await Promise.all(messages.map((m) => fcm.send(m)));
+        await fcm.sendAll(messages);
         console.log("✅ Push notification sent!");
       } catch (err) {
         console.error("❌ Failed to send push notification:", err);

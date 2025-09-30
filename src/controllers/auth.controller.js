@@ -6,7 +6,7 @@ import dotenv from 'dotenv';
 import db from '../../lib/db.js';
 import { v4 as uuidv4 } from 'uuid';
 import { and, ilike, eq, count, or, inArray } from 'drizzle-orm';
-import { users, services, userServices } from '../../drizzle/schema.js';
+import { users, services, userServices, userFcmTokens } from '../../drizzle/schema.js';
 import { sendVerificationEmail } from "../services/email.service.js";
 import { randomBytes } from "crypto";
 dotenv.config();
@@ -77,7 +77,7 @@ export const getAllServices = async (req, res) => {
 }
 
 export const login = async (req, res) => {
-  const { email, password } = req.body
+  const { email, password, fcmToken } = req.body
   if (!email || !password) {
     return res.status(400).json({ status: 400, message: 'Email and password are required.', results: null })
   }
@@ -94,6 +94,21 @@ export const login = async (req, res) => {
   }
 
   const token = generateToken(user)
+  if (fcmToken) {
+    const existing = await db
+      .select()
+      .from(userFcmTokens)
+      .where(eq(userFcmTokens.userId, user.id))
+      .where(eq(userFcmTokens.token, fcmToken))
+      .get();
+
+    if (!existing) {
+      await db.insert(userFcmTokens).values({
+        userId: user.id,
+        token: fcmToken,
+      });
+    }
+  }
   res.json({ status: 200, message: 'Login successful', results: { token, user } })
 }
 
@@ -106,7 +121,7 @@ function getAppleKey(header, callback) {
 }
 
 export const oauthLogin = async (req, res) => {
-  const { provider, id_token } = req.body
+  const { provider, id_token, fcmToken } = req.body
 
   if (provider === 'google') {
     try {
@@ -134,6 +149,22 @@ export const oauthLogin = async (req, res) => {
         }).returning()
 
         user = insertResult[0]
+      }
+
+      if (fcmToken) {
+        const existing = await db
+          .select()
+          .from(userFcmTokens)
+          .where(eq(userFcmTokens.userId, user.id))
+          .where(eq(userFcmTokens.token, fcmToken))
+          .get();
+
+        if (!existing) {
+          await db.insert(userFcmTokens).values({
+            userId: user.id,
+            token: fcmToken
+          });
+        }
       }
 
       const token = generateToken(user)
@@ -168,6 +199,22 @@ export const oauthLogin = async (req, res) => {
         user = insertResult[0]
       }
 
+      if (fcmToken) {
+        const existing = await db
+          .select()
+          .from(userFcmTokens)
+          .where(eq(userFcmTokens.userId, user.id))
+          .where(eq(userFcmTokens.token, fcmToken))
+          .get();
+
+        if (!existing) {
+          await db.insert(userFcmTokens).values({
+            userId: user.id,
+            token: fcmToken
+          });
+        }
+      }
+
       const token = generateToken(user)
       return res.json({ status: 200, message: 'OAuth login successful', results: { token, user } })
     })
@@ -185,6 +232,7 @@ export const register = async (req, res) => {
     mobileNumber,
     serviceId, // harus array of string
     role,
+    fcmToken 
   } = req.body;
 
   if (
@@ -256,6 +304,22 @@ export const register = async (req, res) => {
       serviceId: id,
     }))
   );
+
+  if (fcmToken) {
+    const existingToken = await db
+      .select()
+      .from(userFcmTokens)
+      .where(eq(userFcmTokens.userId, userId))
+      .where(eq(userFcmTokens.token, fcmToken))
+      .get();
+
+    if (!existingToken) {
+      await db.insert(userFcmTokens).values({
+        userId,
+        token: fcmToken
+      });
+    }
+  }
 
   const { password: _, ...userWithoutPassword } = insertResult[0];
   const token = generateToken(userWithoutPassword);
