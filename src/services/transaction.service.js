@@ -447,7 +447,7 @@ export async function updateTransaction(id, data) {
               const messaging = getFirebaseMessagingService(); 
 
               // Panggil sendMulticast dengan struktur yang benar
-              const response = await messaging.sendMulticast({
+              const response = await messaging.sendEachForMulticast({
                   tokens: registrationTokens, 
                   notification: payload.notification,
                   data: payload.data,
