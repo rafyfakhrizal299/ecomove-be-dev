@@ -154,16 +154,12 @@ export const oauthLogin = async (req, res) => {
       }
 
       if (fcmToken) {
-        const existing = await db
-          .select()
-          .from(userFcmTokens)
-          .where(and(
+        const existingArr = await db.select().from(userFcmTokens).where(and(
             eq(userFcmTokens.userId, user.id),
             eq(userFcmTokens.token, fcmToken)
           ))
-          .get(); // single object atau undefined
 
-        if (!existing) {
+        if (existingArr.length === 0) {
           await db.insert(userFcmTokens).values({
             userId: user.id,
             token: fcmToken,
@@ -204,16 +200,12 @@ export const oauthLogin = async (req, res) => {
       }
 
       if (fcmToken) {
-        const existing = await db
-          .select()
-          .from(userFcmTokens)
-          .where(and(
+        const existingArr = await db.select().from(userFcmTokens).where(and(
             eq(userFcmTokens.userId, user.id),
             eq(userFcmTokens.token, fcmToken)
           ))
-          .get(); // single object atau undefined
 
-        if (!existing) {
+        if (existingArr.length === 0) {
           await db.insert(userFcmTokens).values({
             userId: user.id,
             token: fcmToken,
@@ -312,16 +304,12 @@ export const register = async (req, res) => {
   );
 
   if (fcmToken) {
-    const existing = await db
-      .select()
-      .from(userFcmTokens)
-      .where(and(
-        eq(userFcmTokens.userId, user.id),
+    const existingArr = await db.select().from(userFcmTokens).where(and(
+        eq(userFcmTokens.userId, insertResult[0].id),
         eq(userFcmTokens.token, fcmToken)
       ))
-      .get(); // single object atau undefined
 
-    if (!existing) {
+    if (existingArr.length === 0) {
       await db.insert(userFcmTokens).values({
         userId: user.id,
         token: fcmToken,
