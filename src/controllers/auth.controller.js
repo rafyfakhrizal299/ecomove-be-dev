@@ -432,6 +432,21 @@ export const userLogin = async (req, res) => {
   }
 
   const token = generateToken(user)
+  if (fcmToken) {
+    const existing = await db
+      .select()
+      .from(userFcmTokens)
+      .where(eq(userFcmTokens.userId, user.id))
+      .where(eq(userFcmTokens.token, fcmToken))
+      .get();
+
+    if (!existing) {
+      await db.insert(userFcmTokens).values({
+        userId: user.id,
+        token: fcmToken,
+      });
+    }
+  }
   res.json({ status: 200, message: 'Login successful', results: { token, user } })
 }
 
