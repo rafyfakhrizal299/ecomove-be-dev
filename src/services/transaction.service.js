@@ -5,7 +5,6 @@ import { transactions, deliveryRates, savedAddresses, transactionReceivers, driv
 import { eq, and, lte, gte, isNull, or, sql, count, sum } from "drizzle-orm";
 import { fcm } from "../utils/fcmIntegration.js";
 import admin from "firebase-admin";
-import { getMessaging } from "firebase-admin/messaging";
 import dotenv from 'dotenv';
 dotenv.config(); // Ini opsional, tapi membantu
 
@@ -13,10 +12,25 @@ dotenv.config(); // Ini opsional, tapi membantu
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 
 // Hanya inisialisasi jika belum ada instance
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-  });
+if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    try {
+        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+
+        // Hanya inisialisasi jika belum ada instance
+        if (!admin.apps.length) {
+            admin.initializeApp({
+                credential: admin.credential.cert(serviceAccount),
+                // project_id juga bisa ditambahkan di sini secara eksplisit
+                // databaseURL: "https://ecomove-8d946.firebaseio.com" // jika menggunakan Realtime DB
+            });
+            console.log("Firebase Admin SDK initialized successfully using Vercel env.");
+        }
+    } catch (error) {
+        console.error("❌ ERROR: Failed to parse or initialize Firebase Admin SDK:", error.message);
+        console.error("Pastikan FIREBASE_SERVICE_ACCOUNT adalah string JSON satu baris yang valid.");
+    }
+} else {
+    console.warn("⚠️ WARNING: FIREBASE_SERVICE_ACCOUNT environment variable is not set.");
 }
 
 //--------------------------------------------------------------------------------------------------------------------
@@ -455,7 +469,7 @@ export async function updateTransaction(id, data) {
         // 🚀 PANGGILAN LANGSUNG: MENGHINDARI MASALAH EKSPOR/IMPOR
         const messaging = admin.messaging(); // Dapatkan objek messaging
         
-        const response = await messaging.sendMulticast({
+        const response = await messaging.send({
           tokens: registrationTokens,
           ...payload,
         });
