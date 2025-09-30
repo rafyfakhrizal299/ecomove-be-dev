@@ -442,13 +442,10 @@ export const userLogin = async (req, res) => {
   const token = generateToken(user)
   if (fcmToken) {
     const existing = await db
-      .select()
-      .from(userFcmTokens)
-      .where(and(
-        eq(userFcmTokens.userId, user.id),
-        eq(userFcmTokens.token, fcmToken)
-      ))
-      .get(); // single object atau undefined
+      .query.userFcmTokens.findFirst({
+        where: (userFcmTokens, { eq }) =>
+          eq(userFcmTokens.userId, user.id) && eq(userFcmTokens.token, fcmToken),
+      });
 
     if (!existing) {
       await db.insert(userFcmTokens).values({
