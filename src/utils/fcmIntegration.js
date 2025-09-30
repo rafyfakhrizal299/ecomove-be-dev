@@ -19,4 +19,4 @@ if (!admin.apps.length) {
     }
 }
 
-module.exports = admin;
+export default admin;
