@@ -8,4 +8,4 @@ if (!admin.apps.length) {
   });
 }
 
-export const fcm = admin.messaging();
+export const fcm = admin.app().messaging(); 
