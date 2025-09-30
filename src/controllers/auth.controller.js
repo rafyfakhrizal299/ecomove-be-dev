@@ -444,7 +444,7 @@ export const userLogin = async (req, res) => {
     const existingArr = await db.select().from(userFcmTokens).where(and(
         eq(userFcmTokens.userId, user.id),
         eq(userFcmTokens.token, fcmToken)
-      )).all(); // .all() mengembalikan array
+      ))
 
     if (existingArr.length === 0) {
       await db.insert(userFcmTokens).values({
