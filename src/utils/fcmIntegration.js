@@ -1,6 +1,8 @@
 import admin from "firebase-admin";
 // ⚠️ Impor khusus untuk Messaging:
 import { getMessaging } from "firebase-admin/messaging"; 
+import dotenv from 'dotenv';
+dotenv.config();
 
 // import serviceAccount from "../../serviceAccountKey.json";
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
