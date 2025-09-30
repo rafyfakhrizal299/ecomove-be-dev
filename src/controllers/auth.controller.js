@@ -442,13 +442,10 @@ export const userLogin = async (req, res) => {
   const token = generateToken(user)
   if (fcmToken) {
     const existingArr = await db
-      .select()
-      .from(userFcmTokens)
-      .where(and(
+      .select().from(userFcmTokens).where(and(
         eq(userFcmTokens.userId, user.id),
         eq(userFcmTokens.token, fcmToken)
-      ))
-      .all(); // .all() mengembalikan array
+      )).all(); // .all() mengembalikan array
 
     if (existingArr.length === 0) {
       await db.insert(userFcmTokens).values({
