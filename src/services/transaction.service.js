@@ -422,11 +422,11 @@ export async function updateTransaction(id, data) {
         token: t.token,
         notification: {
           title: "📦 Transaction Update",
-          body: `Your order #${trx.id} is now ${trx.status}`,
+          body: `Your order #${trx[0].id} is now ${trx[0].status}`,
         },
         data: {
-          transactionId: trx.id.toString(),
-          status: trx.status,
+          transactionId: trx[0].id.toString(),
+          status: trx[0].status,
         },
       }));
 
