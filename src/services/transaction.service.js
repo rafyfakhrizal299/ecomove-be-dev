@@ -419,7 +419,7 @@ export async function updateTransaction(id, data) {
       .select()
       .from(userFcmTokens)
       .where(eq(userFcmTokens.userId, trx.userId));
-    notif = ['ada']
+    notif = tokens.length
     if (tokens.length > 0) {
       const messages = tokens.map((t) => ({
         token: t.token,
