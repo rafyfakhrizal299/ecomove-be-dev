@@ -418,7 +418,7 @@ export async function updateTransaction(id, data) {
     const tokens = await db
       .select()
       .from(userFcmTokens)
-      .where(eq(userFcmTokens.userId, trx.userId));
+      .where(eq(userFcmTokens.user_id, trx.userId));
 
     if (tokens.length > 0) {
       const messages = tokens.map((t) => ({
