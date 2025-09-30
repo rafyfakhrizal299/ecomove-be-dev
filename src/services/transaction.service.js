@@ -364,7 +364,6 @@ export async function updateTransaction(id, data) {
       .select()
       .from(transactions)
       .where(eq(transactions.id, id))
-      .get();
 
     if (!updatedTrx) return null;
 
