@@ -415,12 +415,11 @@ export async function updateTransaction(id, data) {
   });
   let notif = null
   if (trx) {
-    // const tokens = await db
-    //   .select()
-    //   .from(userFcmTokens)
-    //   .where(eq(userFcmTokens.userId, trx.userId));
-    const tokens = await db.select().from(userFcmTokens).all()
-    notif = tokens
+    const tokens = await db
+      .select()
+      .from(userFcmTokens)
+      .where(eq(userFcmTokens.userId, trx.userId));
+    notif = ['ada']
     if (tokens.length > 0) {
       const messages = tokens.map((t) => ({
         token: t.token,
