@@ -4,6 +4,20 @@ import { db } from "../../drizzle/db.js";
 import { transactions, deliveryRates, savedAddresses, transactionReceivers, drivers, userFcmTokens} from "../../drizzle/schema.js";
 import { eq, and, lte, gte, isNull, or, sql, count, sum } from "drizzle-orm";
 import { fcm } from "../utils/fcmIntegration.js";
+import admin from "firebase-admin";
+import { getMessaging } from "firebase-admin/messaging";
+import dotenv from 'dotenv';
+dotenv.config(); // Ini opsional, tapi membantu
+
+// Pastikan variabel lingkungan Anda tersedia
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+
+// Hanya inisialisasi jika belum ada instance
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+  });
+}
 
 //--------------------------------------------------------------------------------------------------------------------
 // 🔹 Summary
@@ -416,7 +430,7 @@ export async function updateTransaction(id, data) {
   let notif = null
   const transactionObject = trx && trx.length > 0 ? trx[0] : null;
 
-  if (transactionObject) {
+   if (transactionObject) {
     const tokens = await db.select()
       .from(userFcmTokens)
       .where(eq(userFcmTokens.userId, transactionObject.userId));
@@ -424,16 +438,13 @@ export async function updateTransaction(id, data) {
     notif = tokens;
     
     if (tokens.length > 0) {
-      // Ekstrak hanya token pendaftaran dari array hasil query
       const registrationTokens = tokens.map((t) => t.token);
 
       const payload = {
-        // Pesan yang akan ditampilkan di perangkat
         notification: {
           title: "📦 Transaction Update",
           body: `Your order #${transactionObject.id} is now ${transactionObject.status}`,
         },
-        // Data kustom untuk dibaca aplikasi
         data: {
           transactionId: transactionObject.id.toString(),
           status: transactionObject.status,
@@ -441,15 +452,16 @@ export async function updateTransaction(id, data) {
       };
 
       try {
-        // Menggunakan sendMulticast yang lebih robust
-        const response = await fcm.sendMulticast({
-          tokens: registrationTokens, // Array of tokens
-          ...payload, // Payload notifikasi dan data
-        });
+        // 🚀 PANGGILAN LANGSUNG: MENGHINDARI MASALAH EKSPOR/IMPOR
+        const messaging = admin.messaging(); // Dapatkan objek messaging
         
-        console.error("✅ Push notification sent successfully!");
-        // Log respons untuk debugging (misalnya melihat token mana yang gagal)
-        console.error('FCM Multicast Response:', response); 
+        const response = await messaging.sendMulticast({
+          tokens: registrationTokens,
+          ...payload,
+        });
+
+        console.log("✅ Push notification sent successfully!");
+        console.log('FCM Multicast Response:', response); 
 
       } catch (err) {
         console.error("❌ Failed to send push notification:", err);
