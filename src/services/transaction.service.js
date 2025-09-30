@@ -3,36 +3,8 @@ import { db } from "../../drizzle/db.js";
 // import db from '../../lib/db.js';
 import { transactions, deliveryRates, savedAddresses, transactionReceivers, drivers, userFcmTokens} from "../../drizzle/schema.js";
 import { eq, and, lte, gte, isNull, or, sql, count, sum } from "drizzle-orm";
-import { fcm } from "../utils/fcmIntegration.js";
-import admin from "firebase-admin";
-import dotenv from 'dotenv';
-dotenv.config(); // Ini opsional, tapi membantu
 
-// Pastikan variabel lingkungan Anda tersedia
-const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-
-// Hanya inisialisasi jika belum ada instance
-if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-    try {
-        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-
-        // Hanya inisialisasi jika belum ada instance
-        if (!admin.apps.length) {
-            admin.initializeApp({
-                credential: admin.credential.cert(serviceAccount),
-                // project_id juga bisa ditambahkan di sini secara eksplisit
-                // databaseURL: "https://ecomove-8d946.firebaseio.com" // jika menggunakan Realtime DB
-            });
-            console.log("Firebase Admin SDK initialized successfully using Vercel env.");
-        }
-    } catch (error) {
-        console.error("❌ ERROR: Failed to parse or initialize Firebase Admin SDK:", error.message);
-        console.error("Pastikan FIREBASE_SERVICE_ACCOUNT adalah string JSON satu baris yang valid.");
-    }
-} else {
-    console.warn("⚠️ WARNING: FIREBASE_SERVICE_ACCOUNT environment variable is not set.");
-}
-
+const admin = require('../utils/fcmIntegration');
 //--------------------------------------------------------------------------------------------------------------------
 // 🔹 Summary
 export async function getTransactionSummary() {
@@ -442,46 +414,55 @@ export async function updateTransaction(id, data) {
     return updatedTrx;
   });
   let notif = null
-  const transactionObject = trx && trx.length > 0 ? trx[0] : null;
+ const transactionObject = trx && trx.length > 0 ? trx[0] : null;
 
-   if (transactionObject) {
-    const tokens = await db.select()
-      .from(userFcmTokens)
-      .where(eq(userFcmTokens.userId, transactionObject.userId));
-    
-    notif = tokens;
-    
-    if (tokens.length > 0) {
-      const registrationTokens = tokens.map((t) => t.token);
+    // --- 3. Logika Push Notification FCM ---
+    if (transactionObject) {
+      // Ambil semua token FCM untuk user ini
+      const tokens = await db.select()
+          .from(userFcmTokens)
+          .where(eq(userFcmTokens.userId, transactionObject.userId));
 
-      const payload = {
-        notification: {
-          title: "📦 Transaction Update",
-          body: `Your order #${transactionObject.id} is now ${transactionObject.status}`,
-        },
-        data: {
-          transactionId: transactionObject.id.toString(),
-          status: transactionObject.status,
-        },
-      };
+      // 🚨 Filter dan Validasi Token (Solusi error: Exactly one of topic, token or condition is required)
+      const registrationTokens = tokens
+          .map((t) => t.token)
+          .filter(token => token && token.length > 0); 
 
-      try {
-        // 🚀 PANGGILAN LANGSUNG: MENGHINDARI MASALAH EKSPOR/IMPOR
-        const messaging = admin.messaging(); // Dapatkan objek messaging
-        
-        const response = await messaging.send({
-          tokens: registrationTokens,
-          ...payload,
-        });
+      notif = tokens;
 
-        console.log("✅ Push notification sent successfully!");
-        console.log('FCM Multicast Response:', response); 
+      if (registrationTokens.length > 0) {
+          const payload = {
+              notification: {
+                  title: "📦 Transaction Update",
+                  body: `Your order #${transactionObject.id} is now ${transactionObject.status}`,
+              },
+              data: {
+                  // FCM data payload harus berupa string
+                  transactionId: String(transactionObject.id), 
+                  status: transactionObject.status,
+              },
+          };
 
-      } catch (err) {
-        console.error("❌ Failed to send push notification:", err);
+          try {
+              const messaging = admin.messaging();
+
+              // Panggil sendMulticast dengan struktur yang benar
+              const response = await messaging.sendMulticast({
+                  tokens: registrationTokens, 
+                  notification: payload.notification,
+                  data: payload.data,
+              });
+
+              console.log(`✅ Push notification sent successfully to ${response.successCount} devices.`);
+              console.log('FCM Multicast Response:', response);
+
+          } catch (err) {
+              console.error("❌ Failed to send push notification:", err);
+          }
+      } else {
+            console.log(`⚠️ Skipping notification: No valid FCM tokens found for user ${transactionObject.userId}.`);
       }
     }
-  }
 
   return {
     transaction: trx,
