@@ -4,7 +4,7 @@ import { db } from "../../drizzle/db.js";
 import { transactions, deliveryRates, savedAddresses, transactionReceivers, drivers, userFcmTokens} from "../../drizzle/schema.js";
 import { eq, and, lte, gte, isNull, or, sql, count, sum } from "drizzle-orm";
 
-import admin from '../utils/firebaseAdmin.js';
+import admin from '../utils/fcmIntegration.js';
 //--------------------------------------------------------------------------------------------------------------------
 // 🔹 Summary
 export async function getTransactionSummary() {
