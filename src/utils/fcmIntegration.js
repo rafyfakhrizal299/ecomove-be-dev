@@ -1,11 +1,19 @@
 import admin from "firebase-admin";
+// ⚠️ Impor khusus untuk Messaging:
+import { getMessaging } from "firebase-admin/messaging"; 
+
 // import serviceAccount from "../../serviceAccountKey.json";
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 
+let firebaseApp;
+
 if (!admin.apps.length) {
-  admin.initializeApp({
+  firebaseApp = admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
   });
+} else {
+  firebaseApp = admin.app();
 }
 
-export const fcm = admin.app().messaging(); 
+// ⚠️ Definisikan fcm menggunakan getMessaging()
+export const fcm = getMessaging(firebaseApp);

@@ -447,9 +447,9 @@ export async function updateTransaction(id, data) {
           ...payload, // Payload notifikasi dan data
         });
         
-        console.log("✅ Push notification sent successfully!");
+        console.error("✅ Push notification sent successfully!");
         // Log respons untuk debugging (misalnya melihat token mana yang gagal)
-        console.log('FCM Multicast Response:', response); 
+        console.error('FCM Multicast Response:', response); 
 
       } catch (err) {
         console.error("❌ Failed to send push notification:", err);
