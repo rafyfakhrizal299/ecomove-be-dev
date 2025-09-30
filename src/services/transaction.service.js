@@ -413,13 +413,13 @@ export async function updateTransaction(id, data) {
 
     return updatedTrx;
   });
-
+  let notif = null
   if (trx) {
     const tokens = await db
       .select()
       .from(userFcmTokens)
-      .where(eq(userFcmTokens.user_id, trx.userId));
-
+      .where(eq(userFcmTokens.userId, trx.userId));
+notif = tokens
     if (tokens.length > 0) {
       const messages = tokens.map((t) => ({
         token: t.token,
@@ -442,7 +442,10 @@ export async function updateTransaction(id, data) {
     }
   }
 
-  return trx;
+  return {
+    transaction: trx,
+    notif: notif,
+  };
 }
 
 export async function deleteTransaction(id) {
