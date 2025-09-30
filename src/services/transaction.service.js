@@ -486,6 +486,14 @@ export async function getTransactions({ page = 1, limit = 10, filters = {} }) {
   let whereCondition = undefined;
   if (conditions.length === 1) whereCondition = conditions[0];
   else if (conditions.length > 1) whereCondition = and(...conditions);
+
+  // --- helper buat hide password ---
+  const sanitizeUser = (user) => {
+    if (!user) return null;
+    const { password, ...rest } = user; // buang password
+    return rest;
+  };
+
   // ------------- HISTORY TRANSACTION BY USER -------------
   if (page === 0 && limit === 0) {
     const totalQuery = db
@@ -497,7 +505,7 @@ export async function getTransactions({ page = 1, limit = 10, filters = {} }) {
       .select({
         transaction: transactions,
         driver: drivers,
-        user: users
+        user: users,
       })
       .from(transactions)
       .leftJoin(drivers, eq(transactions.driverId, drivers.id))
@@ -511,7 +519,7 @@ export async function getTransactions({ page = 1, limit = 10, filters = {} }) {
       data: rows.map(r => ({
         ...r.transaction,
         driver: r.driver,
-        user: r.user,
+        user: sanitizeUser(r.user),
       })),
       pagination: {
         page: 1,
@@ -521,6 +529,7 @@ export async function getTransactions({ page = 1, limit = 10, filters = {} }) {
       },
     };
   }
+
   // ------------- DEFAULT CONDITION -------------
   const offset = (page - 1) * limit;
   const totalQuery = db
@@ -531,8 +540,8 @@ export async function getTransactions({ page = 1, limit = 10, filters = {} }) {
   const dataQuery = db
     .select({
       transaction: transactions,
-      driver: drivers, // 👈 ambil data driver juga
-      user: users
+      driver: drivers,
+      user: users,
     })
     .from(transactions)
     .leftJoin(drivers, eq(transactions.driverId, drivers.id))
@@ -547,8 +556,8 @@ export async function getTransactions({ page = 1, limit = 10, filters = {} }) {
   return {
     data: rows.map(r => ({
       ...r.transaction,
-      driver: r.driver, // 👈 embed detail driver
-      user: r.user
+      driver: r.driver,
+      user: sanitizeUser(r.user), // 👈 password auto hilang
     })),
     pagination: {
       page,
