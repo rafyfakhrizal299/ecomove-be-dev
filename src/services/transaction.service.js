@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from "uuid";
 import { db } from "../../drizzle/db.js";
 // import db from '../../lib/db.js';
-import { transactions, deliveryRates, savedAddresses, transactionReceivers, drivers, userFcmTokens} from "../../drizzle/schema.js";
+import { transactions, deliveryRates, savedAddresses, transactionReceivers, drivers, userFcmTokens, users} from "../../drizzle/schema.js";
 import { eq, and, lte, gte, isNull, or, sql, count, sum } from "drizzle-orm";
 
 import { getFirebaseMessagingService } from '../utils/fcmIntegration.js'; 
@@ -497,9 +497,11 @@ export async function getTransactions({ page = 1, limit = 10, filters = {} }) {
       .select({
         transaction: transactions,
         driver: drivers,
+        user: users
       })
       .from(transactions)
       .leftJoin(drivers, eq(transactions.driverId, drivers.id))
+      .leftJoin(users, eq(transactions.userId, users.id))
       .where(whereCondition);
 
     const [{ count }] = await totalQuery;
@@ -509,6 +511,7 @@ export async function getTransactions({ page = 1, limit = 10, filters = {} }) {
       data: rows.map(r => ({
         ...r.transaction,
         driver: r.driver,
+        user: r.user,
       })),
       pagination: {
         page: 1,
@@ -529,9 +532,11 @@ export async function getTransactions({ page = 1, limit = 10, filters = {} }) {
     .select({
       transaction: transactions,
       driver: drivers, // 👈 ambil data driver juga
+      user: users
     })
     .from(transactions)
     .leftJoin(drivers, eq(transactions.driverId, drivers.id))
+    .leftJoin(users, eq(transactions.userId, users.id))
     .where(whereCondition)
     .limit(limit)
     .offset(offset);
@@ -543,6 +548,7 @@ export async function getTransactions({ page = 1, limit = 10, filters = {} }) {
     data: rows.map(r => ({
       ...r.transaction,
       driver: r.driver, // 👈 embed detail driver
+      user: r.user
     })),
     pagination: {
       page,
