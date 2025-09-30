@@ -19,14 +19,15 @@ export const requestEmailVerification = async (req, res) => {
   try {
     const { email } = req.body;
 
-    const token = randomBytes(32).toString("hex");
+    // generate 6 digit numeric code
+    const token = Math.floor(100000 + Math.random() * 900000).toString();
 
-    // save token ke user row
+    // simpan ke user row
     await db.update(users).set({ verificationToken: token }).where(eq(users.email, email));
 
     await sendVerificationEmail(email, token);
 
-    res.json({ status: 200, message: "Verification email sent" });
+    res.json({ status: 200, message: "Verification code sent to email" });
   } catch (err) {
     res.status(500).json({ message: "Failed to send email", error: err.message });
   }
@@ -34,21 +35,21 @@ export const requestEmailVerification = async (req, res) => {
 
 export const verifyEmail = async (req, res) => {
   try {
-    const { token } = req.params;
+    const { email, token } = req.body;
 
     const result = await db
       .select()
       .from(users)
-      .where(eq(users.verificationToken, token));
+      .where(and(eq(users.email, email), eq(users.verificationToken, token)));
 
     if (!result.length) {
-      return res.status(400).json({ message: "Invalid token" });
+      return res.status(400).json({ message: "Invalid verification code" });
     }
 
     const user = result[0];
 
     await db.update(users)
-      .set({ isVerified: true, verificationToken: null })
+      .set({ isEmailVerified: true, verificationToken: null })
       .where(eq(users.id, user.id));
 
     res.json({ status: 200, message: "Email verified successfully" });
@@ -139,18 +140,29 @@ export const oauthLogin = async (req, res) => {
       let user = (await db.select().from(users).where(eq(users.providerId, sub)))[0]
 
       if (!user) {
-        const insertResult = await db.insert(users).values({
-          id: uuidv4(),
-          firstName: given_name,
-          lastName: family_name || '',
-          email,
-          provider: 'google',
-          providerId: sub,
-          role: 'USER',
-          emailVerifiedAt: new Date()
-        }).returning()
+        user = (await db.select().from(users).where(eq(users.email, email)))[0]
 
-        user = insertResult[0]
+        if (user) {
+          // update biar link ke google
+          await db.update(users)
+            .set({ provider: 'google', providerId: sub })
+            .where(eq(users.id, user.id))
+          user.provider = 'google'
+          user.providerId = sub
+        } else {
+          // 3. Kalau tetep ga ada → bikin baru
+          const insertResult = await db.insert(users).values({
+            id: uuidv4(),
+            firstName: given_name,
+            lastName: family_name || '',
+            email,
+            provider: 'google',
+            providerId: sub,
+            role: 'USER',
+            isEmailVerified: true
+          }).returning()
+          user = insertResult[0]
+        }
       }
 
       if (fcmToken) {
@@ -193,7 +205,7 @@ export const oauthLogin = async (req, res) => {
           provider: 'apple',
           providerId: sub,
           role: 'USER',
-          emailVerifiedAt: new Date()
+          isEmailVerified: true
         }).returning()
 
         user = insertResult[0]

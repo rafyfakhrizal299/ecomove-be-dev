@@ -89,7 +89,7 @@ export const transactions = pgTable('transactions', {
   orderid: varchar('orderid', { length: 100 }),
   tranID: varchar('tranID', { length: 100 }),
   paymentStatus: text('payment_status').default('pending'),
-  modeOfPayment: text('mode_of_payment').default('fiuuu'),
+  modeOfPayment: text('mode_of_payment').default('COD'),
   status: text('status').default('Booked'), // pending | accepted | on-the-way | delivered | cancelled
 
   driverId: varchar("driver_id", { length: 255 }).references(() => drivers.id),
