@@ -24,8 +24,8 @@ router.post('/register', register)
 router.get('/services', getAllServices)
 router.get('/profile', authMiddleware, getProfile)
 router.put('/edit-user/:id', authMiddleware, editUser)
-router.post("/verify-email", requestEmailVerification);
-router.get("/verify/:token", verifyEmail);
+router.post("/get-token-email", requestEmailVerification);
+router.post("/verify-email", verifyEmail);
 
 router.use(authMiddleware, adminOnly)
 
