@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from "uuid";
 import { db } from "../../drizzle/db.js";
 // import db from '../../lib/db.js';
-import { transactions, deliveryRates, savedAddresses, transactionReceivers, drivers, userFcmTokens, users} from "../../drizzle/schema.js";
+import { transactions, deliveryRates, savedAddresses, transactionReceivers, drivers, userFcmTokens, users, services} from "../../drizzle/schema.js";
 import { eq, and, lte, gte, isNull, or, sql, count, sum } from "drizzle-orm";
 
 import { getFirebaseMessagingService } from '../utils/fcmIntegration.js'; 
@@ -273,6 +273,7 @@ export async function createTransaction(data) {
 
         await db.insert(transactionReceivers).values({
           transactionId: trx.id,
+          serviceId: rc.serviceId,
           receiverAddressId,
           ...receiverData,
           deliveryType: rc.deliveryType,
@@ -323,6 +324,7 @@ export async function getAllTransactions() {
 
 export async function getTransactionById(id) {
   // const [trx] = await db.select().from(transactions).where(eq(transactions.id, id));
+  console.log("Fetching transaction by ID:", id);
   const [trx] = await db
     .select({
       transaction: transactions,
@@ -335,15 +337,22 @@ export async function getTransactionById(id) {
   if (!trx) return null;
 
   const receivers = await db
-    .select()
+    .select({
+      receiver: transactionReceivers,
+      service: services,
+    })
     .from(transactionReceivers)
+    .leftJoin(services, eq(transactionReceivers.serviceId, services.id))
     .where(eq(transactionReceivers.transactionId, id));
 
   // return { ...trx, receivers };
   return {
     ...trx.transaction,
     driver: trx.driver || null,
-    receivers,
+    receivers: receivers.map(r => ({
+      ...r.receiver,
+      service: r.service || null,
+    })),
   };
 }
 
@@ -357,6 +366,7 @@ export async function updateTransaction(id, data) {
         deliveryNotes: data.deliveryNotes,
         status: data.status,
         updatedAt: new Date(),
+        paymentStatus: data.paymentStatus,
       })
       .where(eq(transactions.id, id));
 

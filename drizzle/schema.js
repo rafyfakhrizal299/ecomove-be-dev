@@ -112,6 +112,9 @@ export const transactionReceivers = pgTable('transaction_receivers', {
   id: serial('id').primaryKey(),
   transactionId: integer('transaction_id').references(() => transactions.id).notNull(),
 
+  // Service reference
+  serviceId: integer('service_id').references(() => services.id).notNull(),
+  
   // Receiver
   savedAddress: boolean('saved_address').default(false),
   addAddress: boolean('add_address').default(false),

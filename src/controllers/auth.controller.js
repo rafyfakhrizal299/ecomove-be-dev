@@ -240,14 +240,14 @@ export const register = async (req, res) => {
     email,
     password,
     mobileNumber,
-    serviceId, // harus array of string
+    // serviceId, // harus array of string
     role,
     fcmToken 
   } = req.body;
 
   if (
-    !email || !password || !firstName || !lastName ||
-    !serviceId || !Array.isArray(serviceId) || serviceId.length === 0
+    !email || !password || !firstName || !lastName 
+    // || !serviceId || !Array.isArray(serviceId) || serviceId.length === 0
   ) {
     return res.status(400).json({
       status: 400,
@@ -265,17 +265,17 @@ export const register = async (req, res) => {
     });
   }
 
-  const validServices = await db.select().from(services).where(
-    inArray(services.id, serviceId)
-  );
+  // const validServices = await db.select().from(services).where(
+  //   inArray(services.id, serviceId)
+  // );
 
-  if (validServices.length !== serviceId.length) {
-    return res.status(400).json({
-      status: 400,
-      message: 'One or more serviceIds are invalid.',
-      results: null,
-    });
-  }
+  // if (validServices.length !== serviceId.length) {
+  //   return res.status(400).json({
+  //     status: 400,
+  //     message: 'One or more serviceIds are invalid.',
+  //     results: null,
+  //   });
+  // }
 
   let newRole = 'USER';
   if (role === 'ADMIN') {
@@ -308,12 +308,12 @@ export const register = async (req, res) => {
     emailVerifiedAt: null,
   }).returning();
 
-  await db.insert(userServices).values(
-    serviceId.map(id => ({
-      userId,
-      serviceId: id,
-    }))
-  );
+  // await db.insert(userServices).values(
+  //   serviceId.map(id => ({
+  //     userId,
+  //     serviceId: id,
+  //   }))
+  // );
 
   if (fcmToken) {
     const existingArr = await db.select().from(userFcmTokens).where(and(
