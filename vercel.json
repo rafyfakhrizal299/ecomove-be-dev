@@ -4,7 +4,15 @@
     { "src": "api/index.js", "use": "@vercel/node" }
   ],
   "routes": [
-    { "src": "/.well-known/assetlinks.json", "dest": "/public/.well-known/assetlinks.json" },
+    {
+      "src": "/.well-known/assetlinks.json",
+      "dest": "/public/.well-known/assetlinks.json",
+      "headers": {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+        "Cache-Control": "public, max-age=3600"
+      }
+    },
     { "src": "/(.*)", "dest": "api/index.js" }
   ]
 }
