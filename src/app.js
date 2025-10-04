@@ -19,7 +19,7 @@ app.use(express.json())
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-app.get("/.well-known/assetlinks.json", (req, res) => {
+app.get("/well-known/assetlinks", (req, res) => {
   res.setHeader("Content-Type", "application/json");
   res.send(`[InternetShortcut]
 URL=file:///d%3A/freelance/ecomove-mobile/assetlinks.json`);
