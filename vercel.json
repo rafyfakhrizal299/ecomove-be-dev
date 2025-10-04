@@ -4,7 +4,7 @@
     { "src": "api/index.js", "use": "@vercel/node" }
   ],
   "routes": [
-    { "source": "/.well-known/assetlinks.json", "destination": "/public/.well-known/assetlinks.json" },
+    { "src": "/.well-known/assetlinks.json", "dest": "/public/.well-known/assetlinks.json" },
     { "src": "/(.*)", "dest": "api/index.js" }
   ]
 }
