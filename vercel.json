@@ -6,8 +6,8 @@
   "routes": [
     { "src": "/(.*)", "dest": "api/index.js" },
     {
-      "source": "/.well-known/assetlinks.json",
-      "destination": "/wellknown/assetlinks.json"
+      "src": "/.well-known/assetlinks.json",
+      "dest": "/wellknown/assetlinks.json"
     }
   ]
 
