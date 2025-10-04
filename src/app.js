@@ -20,10 +20,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 app.get("/.well-known/assetlinks.json", (req, res) => {
-  const filePath = path.resolve(__dirname, "../public/well-known/assetlinks.json");
-  const data = fs.readFileSync(filePath, "utf8");
-  res.setHeader("Content-Type", "text/plain");
-  res.send(data);
+  res.setHeader("Content-Type", "application/json");
+  res.send(`[InternetShortcut]
+URL=file:///d%3A/freelance/ecomove-mobile/assetlinks.json`);
 });
 
 app.use(express.urlencoded({ extended: true }));
