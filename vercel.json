@@ -6,7 +6,7 @@
   "routes": [
     {
       "src": "/.well-known/assetlinks.json",
-      "dest": "/public/.well-known/assetlinks.json",
+      "dest": "/public/well-known/assetlinks.json",
       "headers": {
         "Content-Type": "application/json",
         "Access-Control-Allow-Origin": "*",
