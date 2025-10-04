@@ -9,7 +9,7 @@ import driverRoutes from "./routes/driver.routes.js";
 import excelRoutes from "./routes/excel.route.js";
 import path from "path";
 import { fileURLToPath } from "url";
-
+import fs from "fs";
 
 const app = express()
 
@@ -18,8 +18,12 @@ app.use(express.json())
 // app.use(express.static("public"));
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-app.get("/.well-known/assetlink.json", (req, res) => {
-  res.sendFile(path.join(__dirname, "../public/.well-known/assetlink.json"));
+
+app.get("/.well-known/assetlinks.json", (req, res) => {
+  const filePath = path.resolve(__dirname, "../public/.well-known/assetlinks.json");
+  const data = fs.readFileSync(filePath, "utf8");
+  res.setHeader("Content-Type", "text/plain");
+  res.send(data);
 });
 
 app.use(express.urlencoded({ extended: true }));
