@@ -3,12 +3,14 @@
   "builds": [
     { "src": "api/index.js", "use": "@vercel/node" }
   ],
-  "rewrites": [
-    { "source": "/(.*)", "destination": "api/index.js" },
+  "routes": [
     {
-      "source": "/.well-known/assetlinks.json",
-      "destination": "/wellknown/assetlinks.json"
+      "src": "/\\.well-known/assetlinks\\.json",
+      "dest": "/.well-known/assetlinks.json"
+    },
+    { 
+      "src": "/(.*)", 
+      "dest": "api/index.js" 
     }
   ]
-
 }
