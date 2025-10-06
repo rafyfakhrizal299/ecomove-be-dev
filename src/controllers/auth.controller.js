@@ -5,7 +5,7 @@ import jwksClient from 'jwks-rsa';
 import dotenv from 'dotenv';
 import db from '../../lib/db.js';
 import { v4 as uuidv4 } from 'uuid';
-import { and, ilike, eq, count, or, inArray } from 'drizzle-orm';
+import { and, ilike, eq, count, or, inArray, isNull, is } from 'drizzle-orm';
 import { users, services, userServices, userFcmTokens } from '../../drizzle/schema.js';
 import { sendVerificationEmail } from "../services/email.service.js";
 import { randomBytes } from "crypto";
@@ -40,7 +40,7 @@ export const verifyEmail = async (req, res) => {
     const result = await db
       .select()
       .from(users)
-      .where(and(eq(users.email, email), eq(users.verificationToken, token), eq(users.deletedAt, null)));
+      .where(and(eq(users.email, email), eq(users.verificationToken, token), isNull(users.deletedAt)));
 
     if (!result.length) {
       return res.status(400).json({ message: "Invalid verification code" });
@@ -82,8 +82,7 @@ export const login = async (req, res) => {
   if (!email || !password) {
     return res.status(400).json({ status: 400, message: 'Email and password are required.', results: null })
   }
-
-  const result = await db.select().from(users).where(and(eq(users.email, email), eq(users.deletedAt, null)))
+  const result = await db.select().from(users).where(and(eq(users.email, email), isNull(users.deletedAt)))
   const user = result[0]
 
   if (!user || !user.password || !(await bcrypt.compare(password, user.password))) {
@@ -130,7 +129,10 @@ export const oauthLogin = async (req, res) => {
     try {
       const ticket = await googleClient.verifyIdToken({
         idToken: id_token,
-        audience: process.env.GOOGLE_CLIENT_ID
+        audience: [
+          process.env.GOOGLE_CLIENT_ID,
+          process.env.GOOGLE_CLIENT_ID_ANDROID
+        ]
       })
       const payload = ticket.getPayload()
       console.log(payload)
@@ -233,116 +235,82 @@ export const oauthLogin = async (req, res) => {
   }
 }
 
-export const register = async (req, res) => {
-  const {
-    firstName,
-    lastName,
-    email,
-    password,
+export const register = async (req, res) => { 
+  const { 
+    firstName, 
+    lastName, 
+    email, 
+    password, 
     mobileNumber,
-    // serviceId, // harus array of string
-    role,
+    role, 
     fcmToken 
-  } = req.body;
+  } = req.body; 
+  
+  if ( 
+    !email || 
+    !password || 
+    !firstName || 
+    !lastName 
+    ) { 
+      return res.status(400).json({ 
+        status: 400, 
+        message: 'Missing or invalid required fields.', 
+        results: null, 
+      }); 
+    } 
+    
+    const existing = (await db.select().from(users).where(eq(users.email, email)))[0]; 
+    if (existing) { 
+      return res.status(409).json({ status: 409, message: 'Email already registered.', results: null, }); 
+    } 
+    
+    let newRole = 'USER'; 
+    if (role === 'ADMIN') { 
+      const requester = req.user; 
+      if (!requester || requester.role !== 'ADMIN') { 
+        return res.status(403).json({ status: 403, message: 'Only admins can assign ADMIN role.', results: null, }); 
+      } 
+      newRole = 'ADMIN'; 
+    } 
+    
+    const hashed = await bcrypt.hash(password, 10); 
+    const userId = uuidv4(); 
+    
+    const insertResult = await db.insert(users).values({ 
+      id: userId, 
+      firstName, 
+      lastName, 
+      email, 
+      mobileNumber, 
+      password: hashed, 
+      role: newRole, 
+      provider: null, 
+      providerId: null, 
+      emailVerifiedAt: null, 
+    }).returning(); 
+      
+    if (fcmToken) { 
+      const existingArr = await db.select()
+      .from(userFcmTokens)
+      .where(and( eq(userFcmTokens.userId, insertResult[0].id), eq(userFcmTokens.token, fcmToken) )) 
 
-  if (
-    !email || !password || !firstName || !lastName 
-    // || !serviceId || !Array.isArray(serviceId) || serviceId.length === 0
-  ) {
-    return res.status(400).json({
-      status: 400,
-      message: 'Missing or invalid required fields.',
-      results: null,
-    });
-  }
-
-  const existing = (await db.select().from(users).where(and(eq(users.email, email), eq(users.deletedAt, null))))[0];
-  if (existing) {
-    return res.status(409).json({
-      status: 409,
-      message: 'Email already registered.',
-      results: null,
-    });
-  }
-
-  // const validServices = await db.select().from(services).where(
-  //   inArray(services.id, serviceId)
-  // );
-
-  // if (validServices.length !== serviceId.length) {
-  //   return res.status(400).json({
-  //     status: 400,
-  //     message: 'One or more serviceIds are invalid.',
-  //     results: null,
-  //   });
-  // }
-
-  let newRole = 'USER';
-  if (role === 'ADMIN') {
-    const requester = req.user;
-
-    if (!requester || requester.role !== 'ADMIN') {
-      return res.status(403).json({
-        status: 403,
-        message: 'Only admins can assign ADMIN role.',
-        results: null,
-      });
-    }
-
-    newRole = 'ADMIN';
-  }
-
-  const hashed = await bcrypt.hash(password, 10);
-  const userId = uuidv4();
-
-  const insertResult = await db.insert(users).values({
-    id: userId,
-    firstName,
-    lastName,
-    email,
-    mobileNumber,
-    password: hashed,
-    role: newRole,
-    provider: null,
-    providerId: null,
-    emailVerifiedAt: null,
-  }).returning();
-
-  // await db.insert(userServices).values(
-  //   serviceId.map(id => ({
-  //     userId,
-  //     serviceId: id,
-  //   }))
-  // );
-
-  if (fcmToken) {
-    const existingArr = await db.select().from(userFcmTokens).where(and(
-        eq(userFcmTokens.userId, insertResult[0].id),
-        eq(userFcmTokens.token, fcmToken)
-      ))
-
-    if (existingArr.length === 0) {
-      await db.insert(userFcmTokens).values({
-        userId: insertResult[0].id,
-        token: fcmToken,
-      });
-    }
-  }
-
-  const { password: _, ...userWithoutPassword } = insertResult[0];
-  const token = generateToken(userWithoutPassword);
-
-  res.status(201).json({
-    status: 201,
-    message: 'Registration successful',
-    results: {
-      token,
-      user: userWithoutPassword,
-    },
-  });
+      if (existingArr.length === 0) { 
+        await db.insert(userFcmTokens)
+        .values({ userId: insertResult[0].id, token: fcmToken, });
+      } 
+    } 
+    const { password: _, ...userWithoutPassword } = insertResult[0]; 
+    const token = generateToken(userWithoutPassword); 
+    
+    res.status(201).json({
+       status: 201, 
+       message: 'Registration successful', 
+       results: { 
+          token, 
+          user: userWithoutPassword, 
+        },
+    }); 
 };
-
-
 
 export const editUser = async (req, res) => {
   const targetUserId = req.params.id;
@@ -428,7 +396,7 @@ export const userLogin = async (req, res) => {
     return res.status(400).json({ status: 400, message: 'Email and password are required.', results: null })
   }
 
-  const result = await db.select().from(users).where(and(eq(users.email, email), eq(users.deletedAt, null)))
+  const result = await db.select().from(users).where(and(eq(users.email, email), isNull(users.deletedAt)))
   const user = result[0]
 
   if (!user || !user.password || !(await bcrypt.compare(password, user.password))) {
@@ -481,7 +449,7 @@ export const getProfile = async (req, res) => {
         updatedAt: users.updatedAt,
       })
       .from(users)
-      .where(and(eq(users.id, userId), eq(users.deletedAt, null)));
+      .where(and(eq(users.id, userId), isNull(users.deletedAt)));
 
     const user = result[0];
 
@@ -652,88 +620,53 @@ export const deleteUser = async (req, res) => {
 };
 
 export const editPassword = async (req, res) => {
-  try {
-    const userId = req.user?.id;
-    const { oldPassword, newPassword } = req.body;
+  const { oldPassword, newPassword } = req.body;
+  const { id } = req.params;
 
-    if (!userId) {
-      return res.status(401).json({ status: 401, message: 'Unauthorized', results: null });
-    }
+  const userResult = await db
+    .select()
+    .from(users)
+    .where(and(eq(users.id, id), isNull(users.deletedAt)));
 
-    if (!oldPassword || !newPassword) {
-      return res.status(400).json({ status: 400, message: 'Both old and new passwords are required.', results: null });
-    }
-
-    const userResult = await db.select().from(users).where(and(eq(users.id, userId), eq(users.deletedAt, null)));
-    const user = userResult[0];
-
-    if (!user || !user.password) {
-      return res.status(404).json({ status: 404, message: 'User not found', results: null });
-    }
-
-    const match = await bcrypt.compare(oldPassword, user.password);
-    if (!match) {
-      return res.status(400).json({ status: 400, message: 'Incorrect old password.', results: null });
-    }
-
-    const hashed = await bcrypt.hash(newPassword, 10);
-    await db.update(users)
-      .set({ password: hashed, updatedAt: new Date() })
-      .where(eq(users.id, userId));
-
-    res.json({ status: 200, message: 'Password updated successfully', results: null });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ status: 500, message: 'Internal server error', results: null });
+  if (!userResult.length) {
+    return res.status(404).json({ message: 'User not found or deleted' });
   }
+
+  const user = userResult[0];
+  const match = await bcrypt.compare(oldPassword, user.password);
+  if (!match) {
+    return res.status(400).json({ message: 'Old password incorrect' });
+  }
+
+  const hashed = await bcrypt.hash(newPassword, 10);
+  await db.update(users).set({ password: hashed }).where(eq(users.id, id));
+
+  return res.json({ message: 'Password updated successfully' });
 };
 
 export const softDeleteUser = async (req, res) => {
-  try {
-    const userId = req.user?.id; // 👈 ambil ID dari token JWT
+  const { id } = req.params;
+  console.log(id)
+  const user = await db
+    .select()
+    .from(users)
+    .where(and(eq(users.id, id), isNull(users.deletedAt)));
 
-    if (!userId) {
-      return res.status(401).json({
-        status: 401,
-        message: 'Unauthorized',
-        results: null,
-      });
-    }
-
-    // cek user valid dan belum kehapus
-    const userCheck = await db
-      .select()
-      .from(users)
-      .where(and(eq(users.id, userId), eq(users.deletedAt, null)));
-
-    if (!userCheck.length) {
-      return res.status(404).json({
-        status: 404,
-        message: 'User not found or already deleted.',
-        results: null,
-      });
-    }
-
-    // soft delete akun
-    await db
-      .update(users)
-      .set({ deletedAt: new Date(), updatedAt: new Date() })
-      .where(eq(users.id, userId));
-
-    // hapus token FCM user
-    await db.delete(userFcmTokens).where(eq(userFcmTokens.userId, userId));
-
-    return res.status(200).json({
-      status: 200,
-      message: 'Your account has been deleted successfully.',
-      results: null,
-    });
-  } catch (err) {
-    console.error('❌ Error soft delete user:', err);
-    return res.status(500).json({
-      status: 500,
-      message: 'Internal server error',
-      results: null,
+  if (!user.length) {
+    return res.status(404).json({
+      status: 404,
+      message: 'User not found or already deleted',
     });
   }
+
+  await db
+    .update(users)
+    .set({ deletedAt: new Date() })
+    .where(eq(users.id, id));
+
+  return res.json({
+    status: 200,
+    message: 'User deleted successfully',
+  });
 };
+

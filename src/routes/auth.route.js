@@ -28,8 +28,8 @@ router.get('/profile', authMiddleware, getProfile)
 router.put('/edit-user/:id', authMiddleware, editUser)
 router.post("/get-token-email", requestEmailVerification);
 router.post("/verify-email", verifyEmail);
-router.put('/password', editPassword);
-router.delete('/delete', softDeleteUser);
+router.put('/password/:id', editPassword);
+router.delete('/delete/:id', softDeleteUser);
 
 router.use(authMiddleware, adminOnly)
 
