@@ -40,7 +40,7 @@ export const verifyEmail = async (req, res) => {
     const result = await db
       .select()
       .from(users)
-      .where(and(eq(users.email, email), eq(users.verificationToken, token)));
+      .where(and(eq(users.email, email), eq(users.verificationToken, token), eq(users.deletedAt, null)));
 
     if (!result.length) {
       return res.status(400).json({ message: "Invalid verification code" });
@@ -83,7 +83,7 @@ export const login = async (req, res) => {
     return res.status(400).json({ status: 400, message: 'Email and password are required.', results: null })
   }
 
-  const result = await db.select().from(users).where(eq(users.email, email))
+  const result = await db.select().from(users).where(and(eq(users.email, email), eq(users.deletedAt, null)))
   const user = result[0]
 
   if (!user || !user.password || !(await bcrypt.compare(password, user.password))) {
@@ -256,7 +256,7 @@ export const register = async (req, res) => {
     });
   }
 
-  const existing = (await db.select().from(users).where(eq(users.email, email)))[0];
+  const existing = (await db.select().from(users).where(and(eq(users.email, email), eq(users.deletedAt, null))))[0];
   if (existing) {
     return res.status(409).json({
       status: 409,
@@ -428,7 +428,7 @@ export const userLogin = async (req, res) => {
     return res.status(400).json({ status: 400, message: 'Email and password are required.', results: null })
   }
 
-  const result = await db.select().from(users).where(eq(users.email, email))
+  const result = await db.select().from(users).where(and(eq(users.email, email), eq(users.deletedAt, null)))
   const user = result[0]
 
   if (!user || !user.password || !(await bcrypt.compare(password, user.password))) {
@@ -481,7 +481,7 @@ export const getProfile = async (req, res) => {
         updatedAt: users.updatedAt,
       })
       .from(users)
-      .where(eq(users.id, userId));
+      .where(and(eq(users.id, userId), eq(users.deletedAt, null)));
 
     const user = result[0];
 
@@ -611,6 +611,7 @@ export const listUsers = async (req, res) => {
     });
   }
 };
+
 export const deleteUser = async (req, res) => {
   const userId = req.params.id;
   const currentUser = req.user;
@@ -643,6 +644,93 @@ export const deleteUser = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({
+      status: 500,
+      message: 'Internal server error',
+      results: null,
+    });
+  }
+};
+
+export const editPassword = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    const { oldPassword, newPassword } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ status: 401, message: 'Unauthorized', results: null });
+    }
+
+    if (!oldPassword || !newPassword) {
+      return res.status(400).json({ status: 400, message: 'Both old and new passwords are required.', results: null });
+    }
+
+    const userResult = await db.select().from(users).where(and(eq(users.id, userId), eq(users.deletedAt, null)));
+    const user = userResult[0];
+
+    if (!user || !user.password) {
+      return res.status(404).json({ status: 404, message: 'User not found', results: null });
+    }
+
+    const match = await bcrypt.compare(oldPassword, user.password);
+    if (!match) {
+      return res.status(400).json({ status: 400, message: 'Incorrect old password.', results: null });
+    }
+
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await db.update(users)
+      .set({ password: hashed, updatedAt: new Date() })
+      .where(eq(users.id, userId));
+
+    res.json({ status: 200, message: 'Password updated successfully', results: null });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ status: 500, message: 'Internal server error', results: null });
+  }
+};
+
+export const softDeleteUser = async (req, res) => {
+  try {
+    const userId = req.user?.id; // 👈 ambil ID dari token JWT
+
+    if (!userId) {
+      return res.status(401).json({
+        status: 401,
+        message: 'Unauthorized',
+        results: null,
+      });
+    }
+
+    // cek user valid dan belum kehapus
+    const userCheck = await db
+      .select()
+      .from(users)
+      .where(and(eq(users.id, userId), eq(users.deletedAt, null)));
+
+    if (!userCheck.length) {
+      return res.status(404).json({
+        status: 404,
+        message: 'User not found or already deleted.',
+        results: null,
+      });
+    }
+
+    // soft delete akun
+    await db
+      .update(users)
+      .set({ deletedAt: new Date(), updatedAt: new Date() })
+      .where(eq(users.id, userId));
+
+    // hapus token FCM user
+    await db.delete(userFcmTokens).where(eq(userFcmTokens.userId, userId));
+
+    return res.status(200).json({
+      status: 200,
+      message: 'Your account has been deleted successfully.',
+      results: null,
+    });
+  } catch (err) {
+    console.error('❌ Error soft delete user:', err);
+    return res.status(500).json({
       status: 500,
       message: 'Internal server error',
       results: null,
