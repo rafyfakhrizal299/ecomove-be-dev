@@ -323,7 +323,7 @@ export const register = async (req, res) => {
 
     if (existingArr.length === 0) {
       await db.insert(userFcmTokens).values({
-        userId: user.id,
+        userId: users.id,
         token: fcmToken,
       });
     }
