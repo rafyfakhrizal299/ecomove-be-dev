@@ -10,7 +10,9 @@ import {
     getAllServices, 
     listUsers, 
     deleteUser, 
-    editUser  
+    editUser,
+    softDeleteUser,
+    editPassword  
 } from '../controllers/auth.controller.js'
 import authMiddleware from '../middlewares/auth.middleware.js'
 import adminOnly from '../middlewares/admin.middleware.js'
@@ -26,6 +28,8 @@ router.get('/profile', authMiddleware, getProfile)
 router.put('/edit-user/:id', authMiddleware, editUser)
 router.post("/get-token-email", requestEmailVerification);
 router.post("/verify-email", verifyEmail);
+router.put('/password', editPassword);
+router.delete('/delete', softDeleteUser);
 
 router.use(authMiddleware, adminOnly)
 

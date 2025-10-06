@@ -30,6 +30,8 @@ export const users = pgTable('User', {
   isEmailVerified: boolean("is_email_verified").default(false).notNull(),
   verificationToken: varchar("verification_token", { length: 255 }),
   verificationTokenExpiry: timestamp("verification_token_expiry"),
+
+  deletedAt: timestamp('deletedAt', { mode: 'date' }),
 })
 
 export const userServices = pgTable('UserService', {
