@@ -150,17 +150,17 @@ function normalizePinnedLocation(val) {
 
 export async function createTransaction(data) {
   try {
-    let senderAddressId = data.senderAddressId || null;
-    let senderData = {};
+    let senderAddressId = data.senderAddressId || null
+    let senderData = {}
 
     // === SENDER ===
     if (data.savedAddressSender) {
       const [savedSender] = await db
         .select()
         .from(savedAddresses)
-        .where(eq(savedAddresses.id, senderAddressId));
+        .where(eq(savedAddresses.id, senderAddressId))
 
-      if (!savedSender) throw new Error("Sender address not found");
+      if (!savedSender) throw new Error('Sender address not found')
 
       senderData = {
         address: savedSender.address,
@@ -169,7 +169,7 @@ export async function createTransaction(data) {
         contactName: savedSender.contactName,
         contactNumber: savedSender.contactNumber,
         contactEmail: savedSender.contactEmail,
-      };
+      }
     } else {
       senderData = {
         address: data.address,
@@ -178,24 +178,31 @@ export async function createTransaction(data) {
         contactName: data.contactName,
         contactNumber: data.contactNumber,
         contactEmail: data.contactEmail,
-      };
+      }
 
       if (data.addAddress) {
         const [newSenderAddr] = await db
           .insert(savedAddresses)
           .values({
             userId: data.userId,
-            label: data.label || "Sender Address",
+            label: data.label || 'Sender Address',
             ...senderData,
-            type: "sender",
+            type: 'sender',
           })
-          .returning();
+          .returning()
 
-        senderAddressId = newSenderAddr.id;
+        senderAddressId = newSenderAddr.id
       }
     }
 
-    const pickupTime = new Date(data.pickupTime);
+    // === PICKUP ===
+    const pickupType = data.pickupType || 'now'
+    const pickupDate =
+      pickupType === 'now'
+        ? new Date().toISOString().split('T')[0] // YYYY-MM-DD
+        : data.pickupDate
+
+    const pickupTime = pickupType === 'now' ? 'now' : data.pickupTime
 
     // === TRANSACTION ===
     const [trx] = await db
@@ -204,41 +211,45 @@ export async function createTransaction(data) {
         userId: data.userId,
         senderAddressId,
         ...senderData,
+        pickupType,
+        pickupDate,
         pickupTime,
         deliveryNotes: data.deliveryNotes || null,
         orderid: null,
-        paymentStatus: "pending",
-        modeOfPayment: data.modeOfPayment || "fiuuu",
+        paymentStatus: 'pending',
+        modeOfPayment: data.modeOfPayment || 'fiuuu',
         addAddress: data.addAddress ?? false,
       })
-      .returning();
+      .returning()
 
     // === RECEIVERS ===
-    let totalFee = 0;
-    let totalDistance = 0;
+    let totalFee = 0
+    let totalDistance = 0
 
     if (Array.isArray(data.receivers)) {
       for (const rc of data.receivers) {
-        let receiverAddressId = rc.receiverAddressId || null;
-        let receiverData = {};
+        let receiverAddressId = rc.receiverAddressId || null
+        let receiverData = {}
 
         if (rc.savedAddress) {
           const [savedReceiver] = await db
             .select()
             .from(savedAddresses)
-            .where(eq(savedAddresses.id, receiverAddressId));
+            .where(eq(savedAddresses.id, receiverAddressId))
 
-          if (!savedReceiver) throw new Error("Receiver address not found");
+          if (!savedReceiver) throw new Error('Receiver address not found')
 
           receiverData = {
             address: savedReceiver.address,
             unitStreet: savedReceiver.unitStreet,
-            pinnedLocation: normalizePinnedLocation(savedReceiver.pinnedLocation),
+            pinnedLocation: normalizePinnedLocation(
+              savedReceiver.pinnedLocation
+            ),
             contactName: savedReceiver.contactName,
             contactNumber: savedReceiver.contactNumber,
             contactEmail: savedReceiver.contactEmail,
             label: savedReceiver.label,
-          };
+          }
         } else {
           receiverData = {
             address: rc.address,
@@ -248,28 +259,28 @@ export async function createTransaction(data) {
             contactNumber: rc.contactNumber,
             contactEmail: rc.contactEmail,
             label: rc.label,
-          };
+          }
 
           if (rc.addAddress) {
             const [newReceiverAddr] = await db
               .insert(savedAddresses)
               .values({
                 userId: data.userId,
-                label: rc.label || "Receiver Address",
+                label: rc.label || 'Receiver Address',
                 ...receiverData,
-                type: "receiver",
+                type: 'receiver',
               })
-              .returning();
+              .returning()
 
-            receiverAddressId = newReceiverAddr.id;
+            receiverAddressId = newReceiverAddr.id
           }
         }
 
-        const rate = await getRate(rc.deliveryType, rc.packageSize, rc.distance);
-        const fee = rate ? rate.price : 0;
+        const rate = await getRate(rc.deliveryType, rc.packageSize, rc.distance)
+        const fee = rate ? rate.price : 0
 
-        totalFee += fee;
-        totalDistance += rc.distance;
+        totalFee += fee
+        totalDistance += rc.distance
 
         await db.insert(transactionReceivers).values({
           transactionId: trx.id,
@@ -280,7 +291,7 @@ export async function createTransaction(data) {
           packageSize: rc.packageSize,
           itemType: rc.itemType,
           bringPouch: rc.bringPouch ?? false,
-          packageType: rc.packageType || "standard",
+          packageType: rc.packageType || 'standard',
           cod: rc.cod || false,
           itemProtection: rc.itemProtection ?? false,
           deliveryNotes: rc.deliveryNotes || null,
@@ -288,7 +299,7 @@ export async function createTransaction(data) {
           fee,
           weight: rc.weight || null,
           addAddress: rc.addAddress ?? false,
-        });
+        })
       }
     }
 
@@ -297,14 +308,15 @@ export async function createTransaction(data) {
       .update(transactions)
       .set({ totalFee, totalDistance })
       .where(eq(transactions.id, trx.id))
-      .returning();
+      .returning()
 
-    return updatedTrx;
+    return updatedTrx
   } catch (err) {
-    console.error("🔥 SQL ERROR:", err);
-    throw err;
+    console.error('🔥 SQL ERROR:', err)
+    throw err
   }
 }
+
 
 export async function getAllTransactions() {
   // return await db.select().from(transactions);
@@ -366,7 +378,7 @@ export async function updateTransaction(id, data) {
         deliveryNotes: data.deliveryNotes,
         status: data.status,
         updatedAt: new Date(),
-        paymentStatus: data.paymentStatus,
+        // paymentStatus: data.paymentStatus,
       })
       .where(eq(transactions.id, id));
 

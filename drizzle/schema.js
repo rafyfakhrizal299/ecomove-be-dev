@@ -1,9 +1,12 @@
 import {
   pgTable, varchar, boolean, timestamp, text, integer,
-  pgEnum, serial, numeric, date, unique
+  pgEnum, serial, numeric, date, unique, time
 } from 'drizzle-orm/pg-core'
+import { sql } from "drizzle-orm"; // ✅ pindahin ke sini
+
 
 export const roleEnum = pgEnum('Role', ['ADMIN', 'USER'])
+export const vehicleEnum = pgEnum('Vehicle', ['Bike', 'E-bike', 'E-car'])
 
 export const services = pgTable('Service', {
   id: serial('id').primaryKey().notNull(),
@@ -86,7 +89,7 @@ export const transactions = pgTable('transactions', {
   totalDistance: numeric('total_distance'),
   totalFee: numeric('total_fee'),
   deliveryNotes: text('delivery_notes'),
-  pickupTime: timestamp('pickup_time', { mode: 'date' }),
+  // pickupTime: timestamp('pickup_time', { mode: 'date' }),
 
   orderid: varchar('orderid', { length: 100 }),
   tranID: varchar('tranID', { length: 100 }),
@@ -95,6 +98,11 @@ export const transactions = pgTable('transactions', {
   status: text('status').default('Booked'), // pending | accepted | on-the-way | delivered | cancelled
 
   driverId: varchar("driver_id", { length: 255 }).references(() => drivers.id),
+
+  vehicle: vehicleEnum('vehicle').default('Bike').notNull(),
+  pickupType: text('pickup_type').default('now').notNull(), // 'now' | 'anytime'
+  pickupDate: date('pickup_date').defaultNow().notNull(),
+  pickupTime: time('pickup_time').default(sql`CURRENT_TIME`).notNull(),
 
   createdAt: timestamp('created_at', { mode: 'date' }).defaultNow(),
   updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow(),
