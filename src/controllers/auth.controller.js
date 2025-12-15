@@ -400,7 +400,7 @@ export const editUser = async (req, res) => {
     password,
     canAccessCMS,
     role,
-    serviceIds
+    serviceIds = []
   } = req.body;
   
   const updates = {};
@@ -427,7 +427,7 @@ export const editUser = async (req, res) => {
   console.log('Service IDs:', serviceIds);
 
   // Jangan update jika tidak ada field valid
-  if (Object.keys(updates).length === 0 && !Array.isArray(serviceIds)) {
+  if (Object.keys(updates).length === 0 && serviceIds.length === 0) {
     return res.status(400).json({
       status: 400,
       message: 'No valid fields provided for update',
@@ -439,11 +439,11 @@ export const editUser = async (req, res) => {
   await db.update(users).set(updates).where(eq(users.id, targetUserId));
 
   // Update relasi ke services jika ada
-  if (Array.isArray(serviceIds)) {
+ if (Array.isArray(serviceIds) && serviceIds.length > 0) {
     const validServices = await db
       .select()
       .from(services)
-      .where(inArray(services.id, serviceIds.map(Number))); // <== pastikan integer
+      .where(inArray(services.id, serviceIds.map(Number)));
 
     if (validServices.length !== serviceIds.length) {
       return res.status(400).json({
@@ -453,7 +453,9 @@ export const editUser = async (req, res) => {
       });
     }
 
-    await db.delete(userServices).where(eq(userServices.userId, targetUserId));
+    await db.delete(userServices)
+      .where(eq(userServices.userId, targetUserId));
+
     await db.insert(userServices).values(
       serviceIds.map(serviceId => ({
         userId: targetUserId,
@@ -551,7 +553,7 @@ export const getProfile = async (req, res) => {
       .leftJoin(services, eq(userServices.serviceId, services.id))
       .where(eq(userServices.userId, userId));
 
-    const servicesList = userServicesResult.map((s) => ({
+    const servicesList = (userServicesResult || []).map(s => ({
       id: s.id,
       name: s.name,
     }));
@@ -638,7 +640,7 @@ export const listUsers = async (req, res) => {
         .map(s => ({
           id: s.serviceId,
           name: s.serviceName
-        }));
+      })) || [];
 
       const { password, ...userWithoutPassword } = user;
 

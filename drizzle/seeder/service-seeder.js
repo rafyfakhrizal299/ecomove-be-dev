@@ -51,40 +51,40 @@ async function seed() {
   }
 
   // --- Delivery Rates ---
-  const existingRates = await db.select().from(deliveryRates)
+  // const existingRates = await db.select().from(deliveryRates)
 
-  if (existingRates.length === 0) {
-    const deliveryRatesData = [
-      { deliveryType: "same-day", packageSize: "small", minDistance: 0, maxDistance: 5000, price: 150 },
-      { deliveryType: "same-day", packageSize: "small", minDistance: 5001, maxDistance: 10000, price: 180 },
-      { deliveryType: "same-day", packageSize: "small", minDistance: 10001, maxDistance: null, price: 210 },
+  // if (existingRates.length === 0) {
+  //   const deliveryRatesData = [
+  //     { deliveryType: "same-day", packageSize: "small", minDistance: 0, maxDistance: 5000, price: 150 },
+  //     { deliveryType: "same-day", packageSize: "small", minDistance: 5001, maxDistance: 10000, price: 180 },
+  //     { deliveryType: "same-day", packageSize: "small", minDistance: 10001, maxDistance: null, price: 210 },
 
-      { deliveryType: "same-day", packageSize: "large", minDistance: 0, maxDistance: 5000, price: 190 },
-      { deliveryType: "same-day", packageSize: "large", minDistance: 5001, maxDistance: 10000, price: 220 },
-      { deliveryType: "same-day", packageSize: "large", minDistance: 10001, maxDistance: null, price: 250 },
+  //     { deliveryType: "same-day", packageSize: "large", minDistance: 0, maxDistance: 5000, price: 190 },
+  //     { deliveryType: "same-day", packageSize: "large", minDistance: 5001, maxDistance: 10000, price: 220 },
+  //     { deliveryType: "same-day", packageSize: "large", minDistance: 10001, maxDistance: null, price: 250 },
 
-      { deliveryType: "standard", packageSize: "small", minDistance: 0, maxDistance: 5000, price: 120 },
-      { deliveryType: "standard", packageSize: "small", minDistance: 5001, maxDistance: 10000, price: 150 },
-      { deliveryType: "standard", packageSize: "small", minDistance: 10001, maxDistance: null, price: 180 },
+  //     { deliveryType: "standard", packageSize: "small", minDistance: 0, maxDistance: 5000, price: 120 },
+  //     { deliveryType: "standard", packageSize: "small", minDistance: 5001, maxDistance: 10000, price: 150 },
+  //     { deliveryType: "standard", packageSize: "small", minDistance: 10001, maxDistance: null, price: 180 },
 
-      { deliveryType: "standard", packageSize: "large", minDistance: 0, maxDistance: 5000, price: 150 },
-      { deliveryType: "standard", packageSize: "large", minDistance: 5001, maxDistance: 10000, price: 180 },
-      { deliveryType: "standard", packageSize: "large", minDistance: 10001, maxDistance: null, price: 210 }
-    ]
+  //     { deliveryType: "standard", packageSize: "large", minDistance: 0, maxDistance: 5000, price: 150 },
+  //     { deliveryType: "standard", packageSize: "large", minDistance: 5001, maxDistance: 10000, price: 180 },
+  //     { deliveryType: "standard", packageSize: "large", minDistance: 10001, maxDistance: null, price: 210 }
+  //   ]
 
-    await db.insert(deliveryRates).values(
-      deliveryRatesData.map(rate => ({
-        deliveryType: rate.deliveryType,
-        packageSize: rate.packageSize,
-        minDistance: rate.minDistance,
-        maxDistance: rate.maxDistance,
-        price: rate.price
-      }))
-    )
-    console.log('✅ Delivery rates seeded.')
-  } else {
-    console.log('Delivery rates already seeded. Skipping...')
-  }
+  //   await db.insert(deliveryRates).values(
+  //     deliveryRatesData.map(rate => ({
+  //       deliveryType: rate.deliveryType,
+  //       packageSize: rate.packageSize,
+  //       minDistance: rate.minDistance,
+  //       maxDistance: rate.maxDistance,
+  //       price: rate.price
+  //     }))
+  //   )
+  //   console.log('✅ Delivery rates seeded.')
+  // } else {
+  //   console.log('Delivery rates already seeded. Skipping...')
+  // }
 }
 
 seed()

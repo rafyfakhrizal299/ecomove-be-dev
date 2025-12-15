@@ -111,7 +111,7 @@ export const transactions = pgTable('transactions', {
 export const deliveryRates = pgTable("delivery_rates", {
   id: serial("id").primaryKey(),
   deliveryType: text("delivery_type").notNull(),  // "same-day" | "standard"
-  packageSize: text("package_size").notNull(),    // "small" | "large"
+  eVehicle: text("eVehicle").notNull(),    // "small" | "large"
   minDistance: integer("min_distance").notNull(), // dalam M
   maxDistance: integer("max_distance"),           // nullable kalau jarak terakhir >10KM
   price: integer("price").notNull(),              // harga dalam Peso
@@ -123,7 +123,7 @@ export const transactionReceivers = pgTable('transaction_receivers', {
   transactionId: integer('transaction_id').references(() => transactions.id).notNull(),
 
   // Service reference
-  serviceId: integer('service_id').references(() => services.id).notNull(),
+  // serviceId: integer('service_id').references(() => services.id).notNull(),
   
   // Receiver
   savedAddress: boolean('saved_address').default(false),
@@ -139,7 +139,7 @@ export const transactionReceivers = pgTable('transaction_receivers', {
 
   // Detail
   deliveryType: text('delivery_type').notNull(),
-  packageSize: text('package_size').notNull(),
+  eVehicle: text('eVehicle').notNull(),
   distance: numeric('distance'),
   fee: numeric('fee'),
   bringPouch: boolean('bring_pouch').default(false),

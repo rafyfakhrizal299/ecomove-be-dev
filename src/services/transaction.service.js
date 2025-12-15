@@ -121,23 +121,128 @@ export async function getDashboardData() {
 }
 // --------------------------------------------------------------------------------------------------------------------
 
-export async function getRate(deliveryType, packageSize, distance) {
-  const rows = await db
-    .select()
-    .from(deliveryRates)
-    .where(
-      and(
-        eq(deliveryRates.deliveryType, deliveryType),
-        eq(deliveryRates.packageSize, packageSize),
-        lte(deliveryRates.minDistance, distance),
-        or(
-          gte(deliveryRates.maxDistance, distance),
-          isNull(deliveryRates.maxDistance)
-        )
-      )
-    );
+// export async function getRate(deliveryType, eVehicle, distance) {
+//   const rows = await db
+//     .select()
+//     .from(deliveryRates)
+//     .where(
+//       and(
+//         eq(deliveryRates.deliveryType, deliveryType),
+//         eq(deliveryRates.eVehicle, eVehicle),
+//         lte(deliveryRates.minDistance, distance),
+//         or(
+//           gte(deliveryRates.maxDistance, distance),
+//           isNull(deliveryRates.maxDistance)
+//         )
+//       )
+//     )
 
-  return rows[0] || null;
+//   return rows[0] || null
+// }
+function getPhilippinesNow() {
+  return new Date(
+    new Date().toLocaleString('en-US', {
+      timeZone: 'Asia/Manila'
+    })
+  )
+}
+// function validateDeliveryTypeAvailability({
+//   deliveryType,
+//   pickupDateTime,
+//   isHoliday,
+//   isMakatiOrTaguig
+// }) {
+//   const hour = pickupDateTime.getHours()
+//   const day = pickupDateTime.getDay()
+
+//   const isWeekday = day >= 1 && day <= 5
+//   const isWithinTime = hour >= 10 && hour < 18
+
+//   const instantAvailable =
+//     isWeekday &&
+//     isWithinTime &&
+//     !isHoliday &&
+//     isMakatiOrTaguig
+
+//   if (
+//     (deliveryType === 'right-now' ||
+//      deliveryType === 'anytime-today') &&
+//     !instantAvailable
+//   ) {
+//     throw new Error('Instant pickup not available')
+//   }
+// }
+
+export async function getRate(deliveryType, eVehicle, distance) {
+  if (!distance || distance <= 0) {
+    return { price: 0 }
+  }
+
+  const km = Math.ceil(distance / 1000)
+
+  const isInstant =
+    deliveryType === 'right-now' ||
+    deliveryType === 'anytime-today'
+  if (eVehicle === 'bike') {
+    if (isInstant) {
+      const baseKm = 3
+      const basePrice = 50
+      const extraPerKm = 12
+
+      const price =
+        km <= baseKm
+          ? basePrice
+          : basePrice + (km - baseKm) * extraPerKm
+
+      return { price }
+    }
+
+    const baseKm = 3
+    const basePrice = 40
+    const extraPerKm = 10
+
+    const price =
+      km <= baseKm
+        ? basePrice
+        : basePrice + (km - baseKm) * extraPerKm
+
+    return { price }
+  }
+
+  if (eVehicle === 'ebike') {
+    if (isInstant) {
+      const baseKm = 3
+      const basePrice = 65
+      const extraPerKm = 15
+
+      const price =
+        km <= baseKm
+          ? basePrice
+          : basePrice + (km - baseKm) * extraPerKm
+
+      return { price }
+    }
+
+    const baseKm = 3
+    const basePrice = 55
+    const extraPerKm = 13
+
+    const price =
+      km <= baseKm
+        ? basePrice
+        : basePrice + (km - baseKm) * extraPerKm
+
+    return { price }
+  }
+
+  if (eVehicle === 'ecar') {
+    if (isInstant) {
+      return { price: km * 75 }
+    }
+    return { price: km * 65 }
+  }
+
+  throw new Error('Invalid eVehicle or deliveryType')
 }
 
 function normalizePinnedLocation(val) {
@@ -199,7 +304,7 @@ export async function createTransaction(data) {
     const pickupType = data.pickupType || 'now'
     const pickupDate =
       pickupType === 'now'
-        ? new Date().toISOString().split('T')[0] // YYYY-MM-DD
+        ? getPhilippinesNow().toISOString().split('T')[0] // YYYY-MM-DD
         : data.pickupDate
 
     const pickupTime = pickupType === 'now' ? 'now' : data.pickupTime
@@ -276,7 +381,14 @@ export async function createTransaction(data) {
           }
         }
 
-        const rate = await getRate(rc.deliveryType, rc.packageSize, rc.distance)
+        // validateDeliveryTypeAvailability({
+        //   deliveryType: rc.deliveryType,
+        //   pickupDateTime: new Date(),
+        //   isHoliday: rc.isHoliday,
+        //   isMakatiOrTaguig: rc.isMakatiOrTaguig
+        // })
+
+        const rate = await getRate(rc.deliveryType, rc.eVehicle, rc.distance)
         const fee = rate ? rate.price : 0
 
         totalFee += fee
@@ -284,11 +396,10 @@ export async function createTransaction(data) {
 
         await db.insert(transactionReceivers).values({
           transactionId: trx.id,
-          serviceId: rc.serviceId,
           receiverAddressId,
           ...receiverData,
           deliveryType: rc.deliveryType,
-          packageSize: rc.packageSize,
+          eVehicle: rc.eVehicle,
           itemType: rc.itemType,
           bringPouch: rc.bringPouch ?? false,
           packageType: rc.packageType || 'standard',
@@ -354,7 +465,6 @@ export async function getTransactionById(id) {
       service: services,
     })
     .from(transactionReceivers)
-    .leftJoin(services, eq(transactionReceivers.serviceId, services.id))
     .where(eq(transactionReceivers.transactionId, id));
 
   // return { ...trx, receivers };
@@ -396,7 +506,7 @@ export async function updateTransaction(id, data) {
       await tx.delete(transactionReceivers).where(eq(transactionReceivers.transactionId, id));
 
       for (const receiver of data.receivers) {
-        const rate = await getRate(receiver.deliveryType, receiver.packageSize, receiver.distance);
+        const rate = await getRate(receiver.deliveryType, receiver.eVehicle, receiver.distance);
         const fee = rate ? rate.price : 0;
 
         totalFee += fee;
@@ -413,7 +523,8 @@ export async function updateTransaction(id, data) {
           contactEmail: receiver.contactEmail,
           label: receiver.label,
           deliveryType: receiver.deliveryType,
-          packageSize: receiver.packageSize,
+          // packageSize: receiver.packageSize,
+          eVehicle: receiver.eVehicle,
           itemType: receiver.itemType,
           bringPouch: receiver.bringPouch || false,
           packageType: receiver.packageType || "standard",
