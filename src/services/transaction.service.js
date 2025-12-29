@@ -416,7 +416,6 @@ export async function createTransaction(data) {
       }
     }
 
-    // === UPDATE TOTAL ===
     const [updatedTrx] = await db
       .update(transactions)
       .set({ totalFee, totalDistance })
@@ -462,12 +461,9 @@ export async function getTransactionById(id) {
   if (!trx) return null;
 
   const receivers = await db
-    .select({
-      receiver: transactionReceivers,
-      service: services,
-    })
-    .from(transactionReceivers)
-    .where(eq(transactionReceivers.transactionId, id));
+  .select()
+  .from(transactionReceivers)
+  .where(eq(transactionReceivers.transactionId, id));
 
   // return { ...trx, receivers };
   return {
