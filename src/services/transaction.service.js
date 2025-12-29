@@ -394,41 +394,28 @@ export async function createTransaction(data) {
         totalFee += fee
         totalDistance += rc.distance
 
-        try {
-          await db.insert(transactionReceivers).values({
-            transactionId: id,
-            receiverAddressId: receiver.receiverAddressId || undefined,
-            address: receiver.address || undefined,
-            unitStreet: receiver.unitStreet || undefined,
-            pinnedLocation: receiver.pinnedLocation || undefined,
-            contactName: receiver.contactName || undefined,
-            contactNumber: receiver.contactNumber || undefined,
-            contactEmail: receiver.contactEmail || undefined,
-            deliveryType: receiver.deliveryType,
-            eVehicle: receiver.eVehicle,
-            itemType: receiver.itemType || undefined,
-            bringPouch: receiver.bringPouch || false,
-            packageType: receiver.packageType || "standard",
-            cod: receiver.cod || false,
-            itemProtection: receiver.itemProtection || false,
-            deliveryNotes: receiver.deliveryNotes || undefined,
-            distance: receiver.distance || undefined,
-            fee,
-            weight: receiver.weight || undefined,
-            addAddress: receiver.addAddress || false,
-          });
-        } catch (err) {
-          console.error('=== FULL ERROR OBJECT ===');
-          console.error(JSON.stringify(err, null, 2));
-          console.error('=== ERROR PROPERTIES ===');
-          console.error('Message:', err.message);
-          console.error('Code:', err.code);
-          console.error('Detail:', err.detail);
-          console.error('Constraint:', err.constraint);
-          console.error('Table:', err.table);
-          console.error('Column:', err.column);
-          throw err;
-        }
+        await db.insert(transactionReceivers).values({
+          transactionId: trx.id,
+          ...(receiverAddressId !== null && receiverAddressId !== undefined && { receiverAddressId }),
+          address: receiverData.address,
+          unitStreet: receiverData.unitStreet,
+          pinnedLocation: receiverData.pinnedLocation,
+          contactName: receiverData.contactName,
+          contactNumber: receiverData.contactNumber,
+          contactEmail: receiverData.contactEmail || null,
+          deliveryType: rc.deliveryType,
+          eVehicle: rc.eVehicle,
+          distance: rc.distance,
+          fee: fee,
+          bringPouch: rc.bringPouch === true, // Explicit boolean
+          itemType: rc.itemType || null,
+          packageType: rc.packageType || 'standard',
+          cod: rc.cod === true, // Explicit boolean
+          itemProtection: rc.itemProtection === true, // Explicit boolean
+          deliveryNotes: rc.deliveryNotes || null,
+          weight: rc.weight || null,
+          addAddress: rc.addAddress === true, // Explicit boolean
+        })
       }
     }
 
@@ -532,25 +519,27 @@ export async function updateTransaction(id, data) {
 
         await tx.insert(transactionReceivers).values({
           transactionId: id,
-          receiverAddressId: receiver.receiverAddressId || undefined,
-          address: receiver.address || undefined,
-          unitStreet: receiver.unitStreet || undefined,
-          pinnedLocation: receiver.pinnedLocation || undefined,
-          contactName: receiver.contactName || undefined,
-          contactNumber: receiver.contactNumber || undefined,
-          contactEmail: receiver.contactEmail || undefined,
+          receiverAddressId: receiver.receiverAddressId || null,
+          address: receiver.address,
+          unitStreet: receiver.unitStreet,
+          pinnedLocation: receiver.pinnedLocation ? String(receiver.pinnedLocation) : null,
+          contactName: receiver.contactName,
+          contactNumber: receiver.contactNumber,
+          contactEmail: receiver.contactEmail,
+          label: receiver.label,
           deliveryType: receiver.deliveryType,
+          // packageSize: receiver.packageSize,
           eVehicle: receiver.eVehicle,
-          itemType: receiver.itemType || undefined,
+          itemType: receiver.itemType,
           bringPouch: receiver.bringPouch || false,
           packageType: receiver.packageType || "standard",
           cod: receiver.cod || false,
           itemProtection: receiver.itemProtection || false,
-          deliveryNotes: receiver.deliveryNotes || undefined,
-          distance: receiver.distance || undefined,
+          deliveryNotes: receiver.deliveryNotes || null,
+          insurance: receiver.insurance === true,
+          insuranceDetails: receiver.insuranceDetails,
+          distance: receiver.distance,
           fee,
-          weight: receiver.weight || undefined,
-          addAddress: receiver.addAddress || false,
         });
       }
 
