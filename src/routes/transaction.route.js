@@ -8,15 +8,21 @@ import {
   deleteTransaction,
   dashboardController
 } from "../controllers/transaction.controller.js";
+import authMiddleware from '../middlewares/auth.middleware.js'
+import adminOnly from '../middlewares/admin.middleware.js'
 
 const router = express.Router();
 
+router.use(authMiddleware);
+
 router.post("/", createTransaction);
-router.get("/page", getTransactions); // ✅ sudah support pagination & filter
 router.get("/", getAllTransactions);
-router.get("/dashboard", dashboardController);
+router.get("/page", getTransactions);
 router.get("/:id", getTransactionById);
-router.put("/:id", updateTransaction);
+
+router.use(adminOnly);
+router.get("/dashboard", dashboardController);
 router.delete("/:id", deleteTransaction);
+router.put("/:id", updateTransaction);
 
 export default router;

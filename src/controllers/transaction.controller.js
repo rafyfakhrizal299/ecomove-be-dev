@@ -3,24 +3,21 @@ import * as trxService from "../services/transaction.service.js";
 export async function dashboardController(req, res) {
   try {
     const data = await trxService.getDashboardData();
-    res.status(200).json({
-      status: 200,
-      data,
-    });
+    res.status(200).json({ status: 200, data });
   } catch (err) {
-    console.error("🔥 Dashboard error:", err);
-    res.status(500).json({
-      status: 500,
-      message: "Internal server error",
-    });
+    res.status(500).json({ status: 500, message: "Internal server error" });
   }
 }
 
 export const createTransaction = async (req, res) => {
   try {
-    const trx = await trxService.createTransaction(req.body);
+    const trx = await trxService.createTransaction({
+      ...req.body,
+      userId: req.user.id,
+    });
+
     const fullData = await trxService.getTransactionById(trx.id);
-    res.status(201).json({ status: 201, message: "Transaction created", data: fullData  });
+    res.status(201).json({ status: 201, data: fullData });
   } catch (err) {
     res.status(400).json({ status: 400, message: err.message });
   }
@@ -28,17 +25,26 @@ export const createTransaction = async (req, res) => {
 
 export const getAllTransactions = async (req, res) => {
   try {
-    const result = await trxService.getAllTransactions();
+    const result = await trxService.getAllTransactions(req.user);
     res.json({ status: 200, data: result });
   } catch (err) {
     res.status(500).json({ status: 500, message: err.message });
   }
 };
 
+
 export const getTransactionById = async (req, res) => {
   try {
     const trx = await trxService.getTransactionById(Number(req.params.id));
-    if (!trx) return res.status(404).json({ status: 404, message: "Transaction not found" });
+    if (!trx) {
+      return res.status(404).json({ status: 404, message: "Transaction not found" });
+    }
+
+    // 🔒 proteksi ownership
+    if (req.user.role !== "ADMIN" && trx.userId !== req.user.id) {
+      return res.status(403).json({ status: 403, message: "Forbidden" });
+    }
+
     res.json({ status: 200, data: trx });
   } catch (err) {
     res.status(500).json({ status: 500, message: err.message });
@@ -47,9 +53,17 @@ export const getTransactionById = async (req, res) => {
 
 export const updateTransaction = async (req, res) => {
   try {
-    const trx = await trxService.updateTransaction(Number(req.params.id), req.body);
-    if (!trx) return res.status(404).json({ status: 404, message: "Transaction not found" });
-    res.json({ status: 200, message: "Transaction updated", data: trx });
+    const trx = await trxService.getTransactionById(Number(req.params.id));
+    if (!trx) {
+      return res.status(404).json({ status: 404, message: "Transaction not found" });
+    }
+
+    if (req.user.role !== "ADMIN" && trx.userId !== req.user.id) {
+      return res.status(403).json({ status: 403, message: "Forbidden" });
+    }
+
+    const updated = await trxService.updateTransaction(trx.id, req.body);
+    res.json({ status: 200, message: "Transaction updated", data: updated });
   } catch (err) {
     res.status(400).json({ status: 400, message: err.message });
   }
@@ -57,8 +71,16 @@ export const updateTransaction = async (req, res) => {
 
 export const deleteTransaction = async (req, res) => {
   try {
-    const trx = await trxService.deleteTransaction(Number(req.params.id));
-    if (!trx) return res.status(404).json({ status: 404, message: "Transaction not found" });
+    const trx = await trxService.getTransactionById(Number(req.params.id));
+    if (!trx) {
+      return res.status(404).json({ status: 404, message: "Transaction not found" });
+    }
+
+    if (req.user.role !== "ADMIN" && trx.userId !== req.user.id) {
+      return res.status(403).json({ status: 403, message: "Forbidden" });
+    }
+
+    await trxService.deleteTransaction(trx.id);
     res.json({ status: 200, message: "Transaction deleted" });
   } catch (err) {
     res.status(400).json({ status: 400, message: err.message });
@@ -73,10 +95,14 @@ export const getTransactions = async (req, res) => {
     const filters = {
       paymentStatus: req.query.paymentStatus,
       deliveryType: req.query.deliveryType,
-      userId: req.query.userId,
     };
 
-    const result = await trxService.getTransactions({ page, limit, filters });
+    let result = await trxService.getTransactions({ page, limit, filters });
+
+    if (req.user.role !== "ADMIN") {
+      result.data = result.data.filter(trx => trx.userId === req.user.id);
+    }
+
     res.json({ status: 200, message: "Success", ...result });
   } catch (err) {
     res.status(500).json({ status: 500, message: err.message });

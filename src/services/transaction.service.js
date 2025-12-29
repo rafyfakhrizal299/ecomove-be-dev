@@ -430,15 +430,33 @@ export async function createTransaction(data) {
 }
 
 
-export async function getAllTransactions() {
-  // return await db.select().from(transactions);
-  const rows = await db
-    .select({
-      transaction: transactions,
-      driver: drivers,
-    })
-    .from(transactions)
-    .leftJoin(drivers, eq(transactions.driverId, drivers.id));
+export async function getAllTransactions(user) {
+  let query = db
+  .select({
+    transaction: transactions,
+    driver: drivers,
+  })
+  .from(transactions)
+  .leftJoin(drivers, eq(transactions.driverId, drivers.id))
+  .orderBy(
+    sql`
+      CASE
+        WHEN ${transactions.status} IN (
+          'Delivered',
+          'multiple delivery attempts failed',
+          'Returned to Sender'
+        )
+        THEN 1
+        ELSE 0
+      END ASC
+    `
+  );
+
+  if (user.role !== "ADMIN") {
+    query = query.where(eq(transactions.userId, user.id));
+  }
+
+  const rows = await query;
 
   return rows.map((row) => ({
     ...row.transaction,
@@ -506,27 +524,33 @@ export async function updateTransaction(id, data) {
 
         await tx.insert(transactionReceivers).values({
           transactionId: id,
-          receiverAddressId: receiver.receiverAddressId || null,
+          savedAddress: receiver.savedAddress === true,
+          addAddress: receiver.addAddress === true,
+          ...(receiver.receiverAddressId && { receiverAddressId: receiver.receiverAddressId }),
+
           address: receiver.address,
           unitStreet: receiver.unitStreet,
-          pinnedLocation: receiver.pinnedLocation ? String(receiver.pinnedLocation) : null,
+          pinnedLocation: receiver.pinnedLocation
+            ? normalizePinnedLocation(receiver.pinnedLocation)
+            : null,
+
           contactName: receiver.contactName,
           contactNumber: receiver.contactNumber,
           contactEmail: receiver.contactEmail,
           label: receiver.label,
+
           deliveryType: receiver.deliveryType,
-          // packageSize: receiver.packageSize,
           eVehicle: receiver.eVehicle,
-          itemType: receiver.itemType,
-          bringPouch: receiver.bringPouch || false,
-          packageType: receiver.packageType || "standard",
-          cod: receiver.cod || false,
-          itemProtection: receiver.itemProtection || false,
-          deliveryNotes: receiver.deliveryNotes || null,
-          insurance: receiver.insurance === true,
-          insuranceDetails: receiver.insuranceDetails,
           distance: receiver.distance,
           fee,
+
+          bringPouch: receiver.bringPouch === true || receiver.bringPouch === 'true',
+          itemType: receiver.itemType || null,
+          packageType: receiver.packageType || 'standard',
+          cod: receiver.cod === true || receiver.cod === 'true',
+          itemProtection: receiver.itemProtection === true || receiver.itemProtection === 'true',
+          deliveryNotes: receiver.deliveryNotes || null,
+          weight: receiver.weight || null,
         });
       }
 
@@ -541,14 +565,11 @@ export async function updateTransaction(id, data) {
   let notif = null
  const transactionObject = trx && trx.length > 0 ? trx[0] : null;
 
-    // --- 3. Logika Push Notification FCM ---
     if (transactionObject) {
-      // Ambil semua token FCM untuk user ini
       const tokens = await db.select()
           .from(userFcmTokens)
           .where(eq(userFcmTokens.userId, transactionObject.userId));
 
-      // 🚨 Filter dan Validasi Token (Solusi error: Exactly one of topic, token or condition is required)
       const registrationTokens = tokens
           .map((t) => t.token)
           .filter(token => token && token.length > 0); 
@@ -571,7 +592,6 @@ export async function updateTransaction(id, data) {
           try {
               const messaging = getFirebaseMessagingService(); 
 
-              // Panggil sendMulticast dengan struktur yang benar
               const response = await messaging.sendEachForMulticast({
                   tokens: registrationTokens, 
                   notification: payload.notification,
