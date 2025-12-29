@@ -396,7 +396,7 @@ export async function createTransaction(data) {
 
         await db.insert(transactionReceivers).values({
           transactionId: trx.id,
-          receiverAddressId,
+          receiverAddressId: receiverAddressId ?? undefined,
           ...receiverData,
           deliveryType: rc.deliveryType,
           eVehicle: rc.eVehicle,
