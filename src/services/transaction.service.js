@@ -396,20 +396,25 @@ export async function createTransaction(data) {
 
         await db.insert(transactionReceivers).values({
           transactionId: trx.id,
-          receiverAddressId: receiverAddressId ?? undefined,
-          ...receiverData,
+          ...(receiverAddressId !== null && receiverAddressId !== undefined && { receiverAddressId }),
+          address: receiverData.address,
+          unitStreet: receiverData.unitStreet,
+          pinnedLocation: receiverData.pinnedLocation,
+          contactName: receiverData.contactName,
+          contactNumber: receiverData.contactNumber,
+          contactEmail: receiverData.contactEmail || null,
           deliveryType: rc.deliveryType,
           eVehicle: rc.eVehicle,
-          itemType: rc.itemType,
-          bringPouch: rc.bringPouch ?? false,
-          packageType: rc.packageType || 'standard',
-          cod: rc.cod || false,
-          itemProtection: rc.itemProtection ?? false,
-          deliveryNotes: rc.deliveryNotes || null,
           distance: rc.distance,
-          fee,
+          fee: fee,
+          bringPouch: rc.bringPouch === true, // Explicit boolean
+          itemType: rc.itemType || null,
+          packageType: rc.packageType || 'standard',
+          cod: rc.cod === true, // Explicit boolean
+          itemProtection: rc.itemProtection === true, // Explicit boolean
+          deliveryNotes: rc.deliveryNotes || null,
           weight: rc.weight || null,
-          addAddress: rc.addAddress ?? false,
+          addAddress: rc.addAddress === true, // Explicit boolean
         })
       }
     }
