@@ -526,9 +526,8 @@ export async function updateTransaction(id, data) {
           contactName: receiver.contactName,
           contactNumber: receiver.contactNumber,
           contactEmail: receiver.contactEmail,
-          label: receiver.label,
+          // label: receiver.label, ❌ Remove - not in schema
           deliveryType: receiver.deliveryType,
-          // packageSize: receiver.packageSize,
           eVehicle: receiver.eVehicle,
           itemType: receiver.itemType,
           bringPouch: receiver.bringPouch || false,
@@ -536,10 +535,11 @@ export async function updateTransaction(id, data) {
           cod: receiver.cod || false,
           itemProtection: receiver.itemProtection || false,
           deliveryNotes: receiver.deliveryNotes || null,
-          insurance: receiver.insurance === true,
-          insuranceDetails: receiver.insuranceDetails,
+          // insurance: receiver.insurance === true, ❌ Remove - not in schema
+          // insuranceDetails: receiver.insuranceDetails, ❌ Remove - not in schema
           distance: receiver.distance,
           fee,
+          weight: receiver.weight || null, // Add this if it's in your data
         });
       }
 
