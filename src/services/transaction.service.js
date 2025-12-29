@@ -395,7 +395,7 @@ export async function createTransaction(data) {
         totalDistance += rc.distance
 
         try {
-          await tx.insert(transactionReceivers).values({
+          await db.insert(transactionReceivers).values({
             transactionId: id,
             receiverAddressId: receiver.receiverAddressId || undefined,
             address: receiver.address || undefined,
