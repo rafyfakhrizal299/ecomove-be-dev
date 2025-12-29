@@ -519,27 +519,25 @@ export async function updateTransaction(id, data) {
 
         await tx.insert(transactionReceivers).values({
           transactionId: id,
-          receiverAddressId: receiver.receiverAddressId || null,
-          address: receiver.address,
-          unitStreet: receiver.unitStreet,
-          pinnedLocation: receiver.pinnedLocation ? String(receiver.pinnedLocation) : null,
-          contactName: receiver.contactName,
-          contactNumber: receiver.contactNumber,
-          contactEmail: receiver.contactEmail,
-          // label: receiver.label, ❌ Remove - not in schema
+          receiverAddressId: receiver.receiverAddressId || undefined,
+          address: receiver.address || undefined,
+          unitStreet: receiver.unitStreet || undefined,
+          pinnedLocation: receiver.pinnedLocation || undefined,
+          contactName: receiver.contactName || undefined,
+          contactNumber: receiver.contactNumber || undefined,
+          contactEmail: receiver.contactEmail || undefined,
           deliveryType: receiver.deliveryType,
           eVehicle: receiver.eVehicle,
-          itemType: receiver.itemType,
+          itemType: receiver.itemType || undefined,
           bringPouch: receiver.bringPouch || false,
           packageType: receiver.packageType || "standard",
           cod: receiver.cod || false,
           itemProtection: receiver.itemProtection || false,
-          deliveryNotes: receiver.deliveryNotes || null,
-          // insurance: receiver.insurance === true, ❌ Remove - not in schema
-          // insuranceDetails: receiver.insuranceDetails, ❌ Remove - not in schema
-          distance: receiver.distance,
+          deliveryNotes: receiver.deliveryNotes || undefined,
+          distance: receiver.distance || undefined,
           fee,
-          weight: receiver.weight || null, // Add this if it's in your data
+          weight: receiver.weight || undefined,
+          addAddress: receiver.addAddress || false,
         });
       }
 
