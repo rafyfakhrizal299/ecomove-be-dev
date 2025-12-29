@@ -327,7 +327,6 @@ export async function createTransaction(data) {
       })
       .returning()
 
-    // === RECEIVERS ===
     let totalFee = 0
     let totalDistance = 0
 
@@ -347,9 +346,7 @@ export async function createTransaction(data) {
           receiverData = {
             address: savedReceiver.address,
             unitStreet: savedReceiver.unitStreet,
-            pinnedLocation: normalizePinnedLocation(
-              savedReceiver.pinnedLocation
-            ),
+            pinnedLocation: normalizePinnedLocation(savedReceiver.pinnedLocation),
             contactName: savedReceiver.contactName,
             contactNumber: savedReceiver.contactNumber,
             contactEmail: savedReceiver.contactEmail,
@@ -358,12 +355,12 @@ export async function createTransaction(data) {
         } else {
           receiverData = {
             address: rc.address,
-            unitStreet: rc.unitStreet,
-            pinnedLocation: normalizePinnedLocation(rc.pinnedLocation),
+            unitStreet: rc.unitStreet || null,
+            pinnedLocation: rc.pinnedLocation ? normalizePinnedLocation(rc.pinnedLocation) : null, // Handle missing pinnedLocation
             contactName: rc.contactName,
             contactNumber: rc.contactNumber,
-            contactEmail: rc.contactEmail,
-            label: rc.label,
+            contactEmail: rc.contactEmail || null,
+            label: rc.label || null,
           }
 
           if (rc.addAddress) {
@@ -381,13 +378,6 @@ export async function createTransaction(data) {
           }
         }
 
-        // validateDeliveryTypeAvailability({
-        //   deliveryType: rc.deliveryType,
-        //   pickupDateTime: new Date(),
-        //   isHoliday: rc.isHoliday,
-        //   isMakatiOrTaguig: rc.isMakatiOrTaguig
-        // })
-
         const rate = await getRate(rc.deliveryType, rc.eVehicle, rc.distance)
         const fee = rate ? rate.price : 0
 
@@ -396,25 +386,26 @@ export async function createTransaction(data) {
 
         await db.insert(transactionReceivers).values({
           transactionId: trx.id,
+          savedAddress: rc.savedAddress === true,
+          addAddress: rc.addAddress === true,
           ...(receiverAddressId !== null && receiverAddressId !== undefined && { receiverAddressId }),
           address: receiverData.address,
           unitStreet: receiverData.unitStreet,
           pinnedLocation: receiverData.pinnedLocation,
           contactName: receiverData.contactName,
           contactNumber: receiverData.contactNumber,
-          contactEmail: receiverData.contactEmail || null,
+          contactEmail: receiverData.contactEmail,
           deliveryType: rc.deliveryType,
           eVehicle: rc.eVehicle,
           distance: rc.distance,
           fee: fee,
-          bringPouch: rc.bringPouch === true, // Explicit boolean
+          bringPouch: rc.bringPouch === true || rc.bringPouch === 'true', // Handle empty string
           itemType: rc.itemType || null,
-          packageType: rc.packageType || 'standard',
-          cod: rc.cod === true, // Explicit boolean
-          itemProtection: rc.itemProtection === true, // Explicit boolean
+          packageType: rc.packageType || 'standard', // Default value karena notNull di schema
+          cod: rc.cod === true || rc.cod === 'true',
+          itemProtection: rc.itemProtection === true || rc.itemProtection === 'true',
           deliveryNotes: rc.deliveryNotes || null,
           weight: rc.weight || null,
-          addAddress: rc.addAddress === true, // Explicit boolean
         })
       }
     }
