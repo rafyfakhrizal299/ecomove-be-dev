@@ -384,7 +384,7 @@ export async function createTransaction(data) {
         totalFee += fee
         totalDistance += rc.distance
 
-        await db.insert(transactionReceivers).values({
+        const insertData = {
           transactionId: trx.id,
           savedAddress: rc.savedAddress === true,
           addAddress: rc.addAddress === true,
@@ -399,14 +399,20 @@ export async function createTransaction(data) {
           eVehicle: rc.eVehicle,
           distance: rc.distance,
           fee: fee,
-          bringPouch: rc.bringPouch === true || rc.bringPouch === 'true', // Handle empty string
+          bringPouch: rc.bringPouch === true || rc.bringPouch === 'true',
           itemType: rc.itemType || null,
-          packageType: rc.packageType || 'standard', // Default value karena notNull di schema
+          packageType: rc.packageType || 'standard',
           cod: rc.cod === true || rc.cod === 'true',
           itemProtection: rc.itemProtection === true || rc.itemProtection === 'true',
           deliveryNotes: rc.deliveryNotes || null,
           weight: rc.weight || null,
-        })
+        }
+
+        console.log('Insert data:', JSON.stringify(insertData, null, 2))
+        console.log('pinnedLocation type:', typeof insertData.pinnedLocation)
+        console.log('pinnedLocation value:', insertData.pinnedLocation)
+
+        await db.insert(transactionReceivers).values(insertData)
       }
     }
 
