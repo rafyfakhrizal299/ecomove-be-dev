@@ -447,8 +447,6 @@ export async function getAllTransactions() {
 }
 
 export async function getTransactionById(id) {
-  // const [trx] = await db.select().from(transactions).where(eq(transactions.id, id));
-  console.log("Fetching transaction by ID:", id);
   const [trx] = await db
     .select({
       transaction: transactions,
@@ -461,18 +459,14 @@ export async function getTransactionById(id) {
   if (!trx) return null;
 
   const receivers = await db
-  .select()
-  .from(transactionReceivers)
-  .where(eq(transactionReceivers.transactionId, id));
+    .select()
+    .from(transactionReceivers)
+    .where(eq(transactionReceivers.transactionId, id));
 
-  // return { ...trx, receivers };
   return {
     ...trx.transaction,
     driver: trx.driver || null,
-    receivers: receivers.map(r => ({
-      ...r.receiver,
-      service: r.service || null,
-    })),
+    receivers,
   };
 }
 
