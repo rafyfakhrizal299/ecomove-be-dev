@@ -6,7 +6,8 @@ import {
   getTransactionById,
   updateTransaction,
   deleteTransaction,
-  dashboardController
+  dashboardController,
+  cancelTransactionReceiver
 } from "../controllers/transaction.controller.js";
 import authMiddleware from '../middlewares/auth.middleware.js'
 import adminOnly from '../middlewares/admin.middleware.js'
@@ -19,10 +20,11 @@ router.post("/", createTransaction);
 router.get("/", getAllTransactions);
 router.get("/page", getTransactions);
 router.get("/:id", getTransactionById);
+router.delete("/:id", deleteTransaction);
+router.patch('/receivers/:id/cancel', cancelTransactionReceiver)
 
 router.use(adminOnly);
 router.get("/dashboard", dashboardController);
-router.delete("/:id", deleteTransaction);
 router.put("/:id", updateTransaction);
 
 export default router;

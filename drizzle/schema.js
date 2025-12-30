@@ -70,7 +70,7 @@ export const savedAddresses = pgTable('saved_addresses', {
 )
 
 export const transactions = pgTable('transactions', {
-  id: serial('id').primaryKey(),
+  id: varchar('id', { length: 50 }).primaryKey(),
   userId: varchar('user_id', { length: 255 }).references(() => users.id).notNull(),
 
   // Sender
@@ -100,7 +100,7 @@ export const transactions = pgTable('transactions', {
   driverId: varchar("driver_id", { length: 255 }).references(() => drivers.id),
 
   vehicle: vehicleEnum('vehicle').default('Bike').notNull(),
-  pickupType: text('pickup_type').default('now').notNull(), // 'now' | 'anytime'
+  pickupType: text('pickup_type').default('now').notNull(),
   pickupDate: date('pickup_date').defaultNow().notNull(),
   pickupTime: time('pickup_time').default(sql`CURRENT_TIME`).notNull(),
 
@@ -120,7 +120,9 @@ export const deliveryRates = pgTable("delivery_rates", {
 
 export const transactionReceivers = pgTable('transaction_receivers', {
   id: serial('id').primaryKey(),
-  transactionId: integer('transaction_id').references(() => transactions.id).notNull(),
+  transactionId: varchar('transaction_id', { length: 50 })
+  .references(() => transactions.id)
+  .notNull(),
 
   // Service reference
   // serviceId: integer('service_id').references(() => services.id).notNull(),
@@ -149,6 +151,11 @@ export const transactionReceivers = pgTable('transaction_receivers', {
   itemProtection: boolean('item_protection').default(false),
   deliveryNotes: text('delivery_notes'),
   weight: numeric('weight'), // in KG
+
+  co: numeric('co'),
+  eta: integer('eta'), 
+
+  statusCanceled: boolean('status_canceled').default(false),
 
   createdAt: timestamp('created_at', { mode: 'date' }).defaultNow(),
   updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow(),

@@ -76,7 +76,7 @@ export const deleteTransaction = async (req, res) => {
       return res.status(404).json({ status: 404, message: "Transaction not found" });
     }
 
-    if (req.user.role !== "ADMIN" && trx.userId !== req.user.id) {
+    if (trx.userId !== req.user.id) {
       return res.status(403).json({ status: 403, message: "Forbidden" });
     }
 
@@ -86,6 +86,51 @@ export const deleteTransaction = async (req, res) => {
     res.status(400).json({ status: 400, message: err.message });
   }
 };
+
+export const cancelTransactionReceiver = async (req, res) => {
+  try {
+    const receiverId = Number(req.params.id)
+
+    // 1. Ambil receiver + transaction
+    const receiver = await trxService.getTransactionReceiverById(receiverId)
+
+    if (!receiver) {
+      return res
+        .status(404)
+        .json({ status: 404, message: 'Transaction receiver not found' })
+    }
+
+    // 2. Ambil transaction
+    const trx = await trxService.getTransactionById(receiver.transactionId)
+
+    if (!trx) {
+      return res
+        .status(404)
+        .json({ status: 404, message: 'Transaction not found' })
+    }
+
+    // 3. Pencegahan: hanya owner / ADMIN
+    if (req.user.role !== 'ADMIN' && trx.userId !== req.user.id) {
+      return res
+        .status(403)
+        .json({ status: 403, message: 'Forbidden' })
+    }
+
+    // 4. Cancel receiver
+    await trxService.cancelTransactionReceiver({
+      transactionId: trx.id,
+      receiverId,
+    })
+
+    res.json({
+      status: 200,
+      message: 'Transaction receiver canceled successfully',
+    })
+  } catch (err) {
+    res.status(400).json({ status: 400, message: err.message })
+  }
+}
+
 
 export const getTransactions = async (req, res) => {
   try {

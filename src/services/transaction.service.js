@@ -173,16 +173,22 @@ function getPhilippinesNow() {
 //   }
 // }
 
-export async function getRate(deliveryType, eVehicle, distance) {
+export async function getRate(deliveryType, eVehicle, distance, insurance = false) {
   if (!distance || distance <= 0) {
     return { price: 0 }
   }
 
   const km = Math.ceil(distance / 1000)
 
+  const applyInsurance = (price) => {
+    if (!insurance) return price
+    return Math.round(price * 1.02)
+  }
+
   const isInstant =
     deliveryType === 'right-now' ||
     deliveryType === 'anytime-today'
+
   if (eVehicle === 'bike') {
     if (isInstant) {
       const baseKm = 3
@@ -194,7 +200,7 @@ export async function getRate(deliveryType, eVehicle, distance) {
           ? basePrice
           : basePrice + (km - baseKm) * extraPerKm
 
-      return { price }
+      return { price: applyInsurance(price) }
     }
 
     const baseKm = 3
@@ -206,7 +212,7 @@ export async function getRate(deliveryType, eVehicle, distance) {
         ? basePrice
         : basePrice + (km - baseKm) * extraPerKm
 
-    return { price }
+    return { price: applyInsurance(price) }
   }
 
   if (eVehicle === 'ebike') {
@@ -220,7 +226,7 @@ export async function getRate(deliveryType, eVehicle, distance) {
           ? basePrice
           : basePrice + (km - baseKm) * extraPerKm
 
-      return { price }
+      return { price: applyInsurance(price) }
     }
 
     const baseKm = 3
@@ -232,18 +238,17 @@ export async function getRate(deliveryType, eVehicle, distance) {
         ? basePrice
         : basePrice + (km - baseKm) * extraPerKm
 
-    return { price }
+    return { price: applyInsurance(price) }
   }
 
   if (eVehicle === 'ecar') {
-    if (isInstant) {
-      return { price: km * 75 }
-    }
-    return { price: km * 65 }
+    const price = isInstant ? km * 75 : km * 65
+    return { price: applyInsurance(price) }
   }
 
   throw new Error('Invalid eVehicle or deliveryType')
 }
+
 
 function normalizePinnedLocation(val) {
   if (!val) return null;
@@ -252,7 +257,16 @@ function normalizePinnedLocation(val) {
   }
   return String(val);
 }
+async function generateTransactionId() {
+  const result = await db.execute(sql`
+    SELECT MAX(CAST(SUBSTRING(id FROM 4) AS INTEGER)) AS max_id
+    FROM transactions
+    WHERE id LIKE 'eco%'
+  `)
 
+  const lastId = result.rows[0]?.max_id || 0
+  return `eco${lastId + 1}`
+}
 export async function createTransaction(data) {
   try {
     let senderAddressId = data.senderAddressId || null
@@ -309,10 +323,11 @@ export async function createTransaction(data) {
 
     const pickupTime = pickupType === 'now' ? 'now' : data.pickupTime
 
-    // === TRANSACTION ===
+    const transactionId = await generateTransactionId()
     const [trx] = await db
       .insert(transactions)
       .values({
+        id: transactionId,
         userId: data.userId,
         senderAddressId,
         ...senderData,
@@ -378,7 +393,7 @@ export async function createTransaction(data) {
           }
         }
 
-        const rate = await getRate(rc.deliveryType, rc.eVehicle, rc.distance)
+        const rate = await getRate(rc.deliveryType, rc.eVehicle, rc.distance, rc.itemProtection === true || rc.itemProtection === 'true')
         const fee = rate ? rate.price : 0
 
         totalFee += fee
@@ -406,6 +421,8 @@ export async function createTransaction(data) {
           itemProtection: rc.itemProtection === true || rc.itemProtection === 'true',
           deliveryNotes: rc.deliveryNotes || null,
           weight: rc.weight || null,
+          co: rc.co ? Number(rc.co) : null,
+          eta: rc.eta ? Number(rc.eta) : null,
         }
 
         console.log('Insert data:', JSON.stringify(insertData, null, 2))
@@ -429,64 +446,139 @@ export async function createTransaction(data) {
   }
 }
 
+function formatEtaFromSeconds(seconds) {
+  const totalSeconds = Number(seconds) || 0
+  if (totalSeconds <= 0) return null
 
+  const totalMinutes = Math.round(totalSeconds / 60)
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+
+  const parts = []
+  if (hours > 0) parts.push(`${hours} hour${hours > 1 ? 's' : ''}`)
+  if (minutes > 0) parts.push(`${minutes} minute${minutes > 1 ? 's' : ''}`)
+
+  return parts.join(' ')
+}
 export async function getAllTransactions(user) {
   let query = db
-  .select({
-    transaction: transactions,
-    driver: drivers,
-  })
-  .from(transactions)
-  .leftJoin(drivers, eq(transactions.driverId, drivers.id))
-  .orderBy(
-    sql`
-      CASE
-        WHEN ${transactions.status} IN (
-          'Delivered',
-          'multiple delivery attempts failed',
-          'Returned to Sender'
-        )
-        THEN 1
-        ELSE 0
-      END ASC
-    `
-  );
-
-  if (user.role !== "ADMIN") {
-    query = query.where(eq(transactions.userId, user.id));
-  }
-
-  const rows = await query;
-
-  return rows.map((row) => ({
-    ...row.transaction,
-    driver: row.driver || null,
-  }));
-}
-
-export async function getTransactionById(id) {
-  const [trx] = await db
     .select({
       transaction: transactions,
       driver: drivers,
     })
     .from(transactions)
     .leftJoin(drivers, eq(transactions.driverId, drivers.id))
-    .where(eq(transactions.id, id));
+    .orderBy(
+      sql`
+        CASE
+          WHEN ${transactions.status} IN (
+            'Delivered',
+            'multiple delivery attempts failed',
+            'Returned to Sender'
+          )
+          THEN 1
+          ELSE 0
+        END ASC
+      `
+    )
 
-  if (!trx) return null;
+  if (user.role !== 'ADMIN') {
+    query = query.where(eq(transactions.userId, user.id))
+  }
+
+  const rows = await query
+  if (rows.length === 0) return []
+
+  const transactionIds = rows.map(r => r.transaction.id)
 
   const receivers = await db
     .select()
     .from(transactionReceivers)
-    .where(eq(transactionReceivers.transactionId, id));
+    .where(inArray(transactionReceivers.transactionId, transactionIds))
+
+  const receiverMap = {}
+  for (const rc of receivers) {
+    if (!receiverMap[rc.transactionId]) {
+      receiverMap[rc.transactionId] = []
+    }
+    receiverMap[rc.transactionId].push(rc)
+  }
+
+  return rows.map(row => {
+    const trxReceivers = receiverMap[row.transaction.id] || []
+
+    const totalEtaSeconds = trxReceivers.reduce(
+      (sum, r) => sum + (Number(r.eta) || 0),
+      0
+    )
+
+    const totalCO2 = trxReceivers.reduce(
+      (sum, r) => sum + (Number(r.co) || 0),
+      0
+    )
+
+    return {
+      ...row.transaction,
+      driver: row.driver || null,
+      totalETA: formatEtaFromSeconds(totalEtaSeconds),
+      totalCO2,
+      receivers: trxReceivers.map(r => ({
+        ...r,
+        etaFormatted: formatEtaFromSeconds(r.eta), // optional
+      })),
+    }
+  })
+}
+
+
+export async function getTransactionById(id) {
+  const [row] = await db
+    .select({
+      transaction: transactions,
+      driver: drivers,
+    })
+    .from(transactions)
+    .leftJoin(drivers, eq(transactions.driverId, drivers.id))
+    .where(eq(transactions.id, id))
+
+  if (!row) return null
+
+  const receivers = await db
+    .select()
+    .from(transactionReceivers)
+    .where(eq(transactionReceivers.transactionId, id))
+
+  const totalEtaSeconds = receivers.reduce(
+    (sum, r) => sum + (Number(r.eta) || 0),
+    0
+  )
+
+  const totalCO2 = receivers.reduce(
+    (sum, r) => sum + (Number(r.co) || 0),
+    0
+  )
 
   return {
-    ...trx.transaction,
-    driver: trx.driver || null,
-    receivers,
-  };
+    ...row.transaction,
+    driver: row.driver || null,
+    totalETA: formatEtaFromSeconds(totalEtaSeconds),
+    totalCO2,
+    receivers: receivers.map(r => ({
+      ...r,
+      etaFormatted: formatEtaFromSeconds(r.eta),
+    })),
+  }
 }
+
+export async function getTransactionReceiverById(id) {
+  const [receiver] = await db
+    .select()
+    .from(transactionReceivers)
+    .where(eq(transactionReceivers.id, id))
+
+  return receiver || null
+}
+
 
 export async function updateTransaction(id, data) {
   const trx = await db.transaction(async (tx) => {
@@ -551,6 +643,8 @@ export async function updateTransaction(id, data) {
           itemProtection: receiver.itemProtection === true || receiver.itemProtection === 'true',
           deliveryNotes: receiver.deliveryNotes || null,
           weight: receiver.weight || null,
+          co: receiver.co ? Number(receiver.co) : null,
+          eta: receiver.eta ? Number(rc.eta) : null,
         });
       }
 
@@ -615,38 +709,97 @@ export async function updateTransaction(id, data) {
   };
 }
 
+export async function cancelTransactionReceiver({
+  transactionId,
+  receiverId,
+}) {
+  // 1. Ambil status transaction
+  const [trx] = await db
+    .select({
+      id: transactions.id,
+      status: transactions.status,
+    })
+    .from(transactions)
+    .where(eq(transactions.id, transactionId))
+
+  if (!trx) {
+    throw new Error('Transaction not found')
+  }
+
+  // 2. Validasi status transaction (TIDAK BOLEH)
+  const forbiddenStatuses = [
+    'Delivered',
+    'multiple delivery attempts failed',
+    'Returned to Sender',
+  ]
+
+  if (forbiddenStatuses.includes(trx.status)) {
+    throw new Error(
+      `Cannot cancel receiver. Transaction already ${trx.status}`
+    )
+  }
+
+  // 3. Pastikan receiver ada & milik transaction tsb
+  const [receiver] = await db
+    .select()
+    .from(transactionReceivers)
+    .where(
+      and(
+        eq(transactionReceivers.id, receiverId),
+        eq(transactionReceivers.transactionId, transactionId)
+      )
+    )
+
+  if (!receiver) {
+    throw new Error('Transaction receiver not found')
+  }
+
+  // 4. Jika sudah canceled
+  if (receiver.statusCanceled === true) {
+    return
+  }
+
+  // 5. Update statusCanceled
+  await db
+    .update(transactionReceivers)
+    .set({
+      statusCanceled: true,
+      updatedAt: new Date(),
+    })
+    .where(eq(transactionReceivers.id, receiverId))
+}
+
+
 export async function deleteTransaction(id) {
   const [deleted] = await db.delete(transactions).where(eq(transactions.id, id)).returning();
   return deleted;
 }
 
 export async function getTransactions({ page = 1, limit = 10, filters = {} }) {
-  const conditions = [];
-  page = Number(page);
-  limit = Number(limit);
+  const conditions = []
+  page = Number(page)
+  limit = Number(limit)
 
-  if (filters.paymentStatus) conditions.push(eq(transactions.paymentStatus, filters.paymentStatus));
-  if (filters.userId) conditions.push(eq(transactions.userId, filters.userId));
+  if (filters.paymentStatus)
+    conditions.push(eq(transactions.paymentStatus, filters.paymentStatus))
+  if (filters.userId)
+    conditions.push(eq(transactions.userId, filters.userId))
 
-  let whereCondition = undefined;
-  if (conditions.length === 1) whereCondition = conditions[0];
-  else if (conditions.length > 1) whereCondition = and(...conditions);
+  let whereCondition = undefined
+  if (conditions.length === 1) whereCondition = conditions[0]
+  else if (conditions.length > 1) whereCondition = and(...conditions)
 
-  // --- helper buat hide password ---
   const sanitizeUser = (user) => {
-    if (!user) return null;
-    const { password, ...rest } = user; // buang password
-    return rest;
-  };
+    if (!user) return null
+    const { password, ...rest } = user
+    return rest
+  }
 
-  // ------------- HISTORY TRANSACTION BY USER -------------
-  if (page === 0 && limit === 0) {
-    const totalQuery = db
-      .select({ count: sql`count(*)` })
-      .from(transactions)
-      .where(whereCondition);
-
-    const dataQuery = db
+  /** ===============================
+   * FETCH TRANSACTIONS
+   =============================== */
+  const fetchTransactions = async (withLimit = true) => {
+    let q = db
       .select({
         transaction: transactions,
         driver: drivers,
@@ -655,60 +808,90 @@ export async function getTransactions({ page = 1, limit = 10, filters = {} }) {
       .from(transactions)
       .leftJoin(drivers, eq(transactions.driverId, drivers.id))
       .leftJoin(users, eq(transactions.userId, users.id))
-      .where(whereCondition);
+      .where(whereCondition)
 
-    const [{ count }] = await totalQuery;
-    const rows = await dataQuery;
+    if (withLimit) {
+      q = q.limit(limit).offset((page - 1) * limit)
+    }
 
-    return {
-      data: rows.map(r => ({
-        ...r.transaction,
-        driver: r.driver,
-        user: sanitizeUser(r.user),
-      })),
-      pagination: {
-        page: 1,
-        limit: Number(count),
-        total: Number(count),
-        totalPages: 1,
-      },
-    };
+    return q
   }
 
-  // ------------- DEFAULT CONDITION -------------
-  const offset = (page - 1) * limit;
   const totalQuery = db
     .select({ count: sql`count(*)` })
     .from(transactions)
-    .where(whereCondition);
-
-  const dataQuery = db
-    .select({
-      transaction: transactions,
-      driver: drivers,
-      user: users,
-    })
-    .from(transactions)
-    .leftJoin(drivers, eq(transactions.driverId, drivers.id))
-    .leftJoin(users, eq(transactions.userId, users.id))
     .where(whereCondition)
-    .limit(limit)
-    .offset(offset);
 
-  const [{ count }] = await totalQuery;
-  const rows = await dataQuery;
+  const [{ count }] = await totalQuery
+  const rows =
+    page === 0 && limit === 0
+      ? await fetchTransactions(false)
+      : await fetchTransactions(true)
+
+  if (rows.length === 0) {
+    return {
+      data: [],
+      pagination: {
+        page,
+        limit,
+        total: Number(count),
+        totalPages: Math.ceil(Number(count) / limit),
+      },
+    }
+  }
+
+  /** ===============================
+   * FETCH RECEIVERS
+   =============================== */
+  const transactionIds = rows.map((r) => r.transaction.id)
+
+  const receivers = await db
+    .select()
+    .from(transactionReceivers)
+    .where(inArray(transactionReceivers.transactionId, transactionIds))
+
+  const receiverMap = {}
+  for (const rc of receivers) {
+    if (!receiverMap[rc.transactionId]) {
+      receiverMap[rc.transactionId] = []
+    }
+    receiverMap[rc.transactionId].push(rc)
+  }
+
+  /** ===============================
+   * BUILD RESPONSE
+   =============================== */
+  const data = rows.map((r) => {
+    const trxReceivers = receiverMap[r.transaction.id] || []
+
+    const totalETA = trxReceivers.reduce(
+      (sum, x) => sum + (Number(x.eta) || 0),
+      0
+    )
+
+    const totalCO2 = trxReceivers.reduce(
+      (sum, x) => sum + (Number(x.co) || 0),
+      0
+    )
+
+    return {
+      ...r.transaction,
+      driver: r.driver || null,
+      user: sanitizeUser(r.user),
+      totalETA,
+      totalETAFormatted: formatETA(totalETA),
+      totalCO2,
+      receivers: trxReceivers,
+    }
+  })
 
   return {
-    data: rows.map(r => ({
-      ...r.transaction,
-      driver: r.driver,
-      user: sanitizeUser(r.user), // 👈 password auto hilang
-    })),
+    data,
     pagination: {
-      page,
-      limit,
+      page: page === 0 ? 1 : page,
+      limit: page === 0 ? Number(count) : limit,
       total: Number(count),
-      totalPages: Math.ceil(Number(count) / limit),
+      totalPages: page === 0 ? 1 : Math.ceil(Number(count) / limit),
     },
-  };
+  }
 }
