@@ -182,7 +182,7 @@ export async function getRate(deliveryType, eVehicle, distance, insurance = fals
 
   const applyInsurance = (price) => {
     if (!insurance) return price
-    return Math.round(price * 1.02)
+    return price * 1.02
   }
 
   const isInstant =
@@ -393,10 +393,10 @@ export async function createTransaction(data) {
           }
         }
 
-        const rate = await getRate(rc.deliveryType, rc.eVehicle, rc.distance, rc.itemProtection === true || rc.itemProtection === 'true')
-        const fee = rate ? rate.price : 0
+        // const rate = await getRate(rc.deliveryType, rc.eVehicle, rc.distance, rc.itemProtection === true || rc.itemProtection === 'true')
+        // const fee = rate ? Number(rate.price).toFixed(2) : '0.00'
 
-        totalFee += fee
+        // totalFee += Number(fee)
         totalDistance += rc.distance
 
         const insertData = {
@@ -413,7 +413,7 @@ export async function createTransaction(data) {
           deliveryType: rc.deliveryType,
           eVehicle: rc.eVehicle,
           distance: rc.distance,
-          fee: fee,
+          fee: rc.fee,
           bringPouch: rc.bringPouch === true || rc.bringPouch === 'true',
           itemType: rc.itemType || null,
           packageType: rc.packageType || 'standard',
