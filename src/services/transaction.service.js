@@ -775,6 +775,19 @@ export async function deleteTransaction(id) {
   return deleted;
 }
 
+function formatETA(seconds) {
+  if (!seconds || seconds <= 0) return '0 min'
+
+  const hrs = Math.floor(seconds / 3600)
+  const mins = Math.ceil((seconds % 3600) / 60)
+
+  if (hrs > 0) {
+    return `${hrs} hr ${mins} min`
+  }
+
+  return `${mins} min`
+}
+
 export async function getTransactions({ page = 1, limit = 10, filters = {} }) {
   const conditions = []
   page = Number(page)
@@ -794,10 +807,6 @@ export async function getTransactions({ page = 1, limit = 10, filters = {} }) {
     const { password, ...rest } = user
     return rest
   }
-
-  /** ===============================
-   * FETCH TRANSACTIONS
-   =============================== */
   const fetchTransactions = async (withLimit = true) => {
     let q = db
       .select({
