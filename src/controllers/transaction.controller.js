@@ -35,9 +35,23 @@ export const getAllTransactions = async (req, res) => {
 
 export const getTransactionById = async (req, res) => {
   try {
-    const trx = await trxService.getTransactionById(Number(req.params.id));
+    const { id } = req.params;
+
+    // ✅ validasi eco<number>
+    if (!/^eco\d+$/.test(id)) {
+      return res.status(404).json({
+        status: 404,
+        message: "Transaction not found",
+      });
+    }
+
+    const trx = await trxService.getTransactionById(id);
+
     if (!trx) {
-      return res.status(404).json({ status: 404, message: "Transaction not found" });
+      return res.status(404).json({
+        status: 404,
+        message: "Transaction not found",
+      });
     }
 
     // 🔒 proteksi ownership
@@ -51,9 +65,20 @@ export const getTransactionById = async (req, res) => {
   }
 };
 
+
 export const updateTransaction = async (req, res) => {
   try {
-    const trx = await trxService.getTransactionById(Number(req.params.id));
+    const { id } = req.params;
+
+    if (!/^eco\d+$/.test(id)) {
+      return res.status(404).json({
+        status: 404,
+        message: "Transaction not found",
+      });
+    }
+
+    const trx = await trxService.getTransactionById(id);
+
     if (!trx) {
       return res.status(404).json({ status: 404, message: "Transaction not found" });
     }
@@ -62,16 +87,28 @@ export const updateTransaction = async (req, res) => {
       return res.status(403).json({ status: 403, message: "Forbidden" });
     }
 
-    const updated = await trxService.updateTransaction(trx.id, req.body);
+    const updated = await trxService.updateTransaction(id, req.body);
+
     res.json({ status: 200, message: "Transaction updated", data: updated });
   } catch (err) {
     res.status(400).json({ status: 400, message: err.message });
   }
 };
 
+
 export const deleteTransaction = async (req, res) => {
   try {
-    const trx = await trxService.getTransactionById(Number(req.params.id));
+    const { id } = req.params;
+
+    if (!/^eco\d+$/.test(id)) {
+      return res.status(404).json({
+        status: 404,
+        message: "Transaction not found",
+      });
+    }
+
+    const trx = await trxService.getTransactionById(id);
+
     if (!trx) {
       return res.status(404).json({ status: 404, message: "Transaction not found" });
     }
@@ -80,12 +117,14 @@ export const deleteTransaction = async (req, res) => {
       return res.status(403).json({ status: 403, message: "Forbidden" });
     }
 
-    await trxService.deleteTransaction(trx.id);
+    await trxService.deleteTransaction(id);
+
     res.json({ status: 200, message: "Transaction deleted" });
   } catch (err) {
     res.status(400).json({ status: 400, message: err.message });
   }
 };
+
 
 export const cancelTransactionReceiver = async (req, res) => {
   try {

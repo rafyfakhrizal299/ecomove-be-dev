@@ -16,20 +16,16 @@ const router = express.Router();
 
 router.use(authMiddleware);
 
-// ===== PUBLIC (LOGIN REQUIRED) =====
-router.post("/", createTransaction);
-router.get("/", getAllTransactions);
+router.get("/dashboard", adminOnly, dashboardController);
 router.get("/page", getTransactions);
 
-// receiver
+router.post("/", createTransaction);
+router.get("/", getAllTransactions);
+
 router.patch("/receivers/:id/cancel", cancelTransactionReceiver);
 
-// ===== ADMIN ONLY =====
-router.get("/dashboard", adminOnly, dashboardController);
-router.put("/:id(eco[0-9]+)", adminOnly, updateTransaction);
-
-// ===== BY ID (eco<number>) =====
-router.get("/:id(eco[0-9]+)", getTransactionById);
-router.delete("/:id(eco[0-9]+)", deleteTransaction);
+router.get("/:id", getTransactionById);
+router.put("/:id", adminOnly, updateTransaction);
+router.delete("/:id", deleteTransaction);
 
 export default router;
