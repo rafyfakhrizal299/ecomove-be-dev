@@ -173,15 +173,19 @@ export const cancelTransactionReceiver = async (req, res) => {
 
 export const getTransactions = async (req, res) => {
   try {
-    const page = req.query.page || 1;
-    const limit = req.query.limit || 10;
+    const page = Number(req.query.page);
+    const limit = Number(req.query.limit);
 
     const filters = {
       paymentStatus: req.query.paymentStatus,
       deliveryType: req.query.deliveryType,
     };
 
-    let result = await trxService.getTransactions({ page, limit, filters });
+    let result = await trxService.getTransactions({
+      page: Number.isNaN(page) || page <= 0 ? 1 : page,
+      limit: Number.isNaN(limit) || limit <= 0 ? 10 : limit,
+      filters,
+    });
 
     if (req.user.role !== "ADMIN") {
       result.data = result.data.filter(trx => trx.userId === req.user.id);
