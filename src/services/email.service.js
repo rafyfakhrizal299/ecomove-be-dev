@@ -31,7 +31,7 @@ export async function sendVerificationEmail(to, token) {
 }
 export async function sendWelcomeEmail({ to, fullname }) {
   try {
-    await axios.post(ELASTIC_URL, null, {
+    await axios.post("https://api.elasticemail.com/v2/email/send", null, {
       params: {
         apikey: process.env.ELASTIC_EMAIL_API_KEY,
         from: process.env.ELASTIC_EMAIL_FROM,
