@@ -9,6 +9,7 @@ import { and, ilike, eq, count, or, inArray, isNull, is } from 'drizzle-orm';
 import { users, services, userServices, userFcmTokens } from '../../drizzle/schema.js';
 import { sendVerificationEmail } from "../services/email.service.js";
 import { randomBytes } from "crypto";
+import { sendWelcomeEmail } from '../services/emailService';
 dotenv.config();
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
@@ -144,6 +145,167 @@ function getAppleKey(header, callback) {
   })
 }
 
+// export const oauthLogin = async (req, res) => {
+//   const { provider, id_token, fcmToken } = req.body;
+
+//   if (provider === 'google') {
+//     try {
+//       const ticket = await googleClient.verifyIdToken({
+//         idToken: id_token,
+//         audience: [
+//           process.env.GOOGLE_CLIENT_ID,
+//           process.env.GOOGLE_CLIENT_ID_ANDROID
+//         ]
+//       });
+
+//       const payload = ticket.getPayload();
+//       const { sub, email, given_name, family_name } = payload;
+
+//       let user = (
+//         await db.select().from(users).where(eq(users.providerId, sub))
+//       )[0];
+
+//       if (!user) {
+//         user = (
+//           await db.select().from(users).where(eq(users.email, email))
+//         )[0];
+
+//         if (user) {
+//           await db.update(users)
+//             .set({ provider: 'google', providerId: sub })
+//             .where(eq(users.id, user.id));
+
+//           user.provider = 'google';
+//           user.providerId = sub;
+//         } else {
+//           const insertResult = await db.insert(users).values({
+//             id: uuidv4(),
+//             firstName: given_name,
+//             lastName: family_name || '',
+//             email,
+//             provider: 'google',
+//             providerId: sub,
+//             role: 'USER',
+//             isEmailVerified: true
+//           }).returning();
+//           user = insertResult[0];
+//         }
+//       }
+
+//       // Save FCM if needed
+//       if (fcmToken) {
+//         const existingArr = await db.select().from(userFcmTokens).where(
+//           and(
+//             eq(userFcmTokens.userId, user.id),
+//             eq(userFcmTokens.token, fcmToken)
+//           )
+//         );
+
+//         if (existingArr.length === 0) {
+//           await db.insert(userFcmTokens).values({
+//             userId: user.id,
+//             token: fcmToken
+//           });
+//         }
+//       }
+
+//       // Convert output → fullname
+//       user.fullname = buildFullName(user);
+//       delete user.firstName;
+//       delete user.lastName;
+
+//       const token = generateToken(user);
+
+//       return res.json({
+//         status: 200,
+//         message: 'OAuth login successful',
+//         results: { token, user }
+//       });
+//     } catch (error) {
+//       console.error(error);
+//       return res.status(401).json({
+//         status: 401,
+//         message: 'Invalid Google token.',
+//         results: null
+//       });
+//     }
+//   }
+
+//   // ---------------- APPLE -----------------
+//   if (provider === 'apple') {
+//     jwt.verify(
+//       id_token,
+//       getAppleKey,
+//       { algorithms: ['RS256'] },
+//       async (err, payload) => {
+//         if (err) {
+//           console.error(err);
+//           return res.status(401).json({
+//             status: 401,
+//             message: 'Invalid Apple token',
+//             results: null
+//           });
+//         }
+
+//         const { sub, email } = payload;
+
+//         let user = (
+//           await db.select().from(users).where(eq(users.providerId, sub))
+//         )[0];
+
+//         if (!user) {
+//           const insertResult = await db.insert(users).values({
+//             firstName: 'Apple',
+//             lastName: 'User',
+//             email,
+//             provider: 'apple',
+//             providerId: sub,
+//             role: 'USER',
+//             isEmailVerified: true
+//           }).returning();
+
+//           user = insertResult[0];
+//         }
+
+//         // Save FCM if needed
+//         if (fcmToken) {
+//           const existingArr = await db.select().from(userFcmTokens).where(
+//             and(
+//               eq(userFcmTokens.userId, user.id),
+//               eq(userFcmTokens.token, fcmToken)
+//             )
+//           );
+
+//           if (existingArr.length === 0) {
+//             await db.insert(userFcmTokens).values({
+//               userId: user.id,
+//               token: fcmToken
+//             });
+//           }
+//         }
+
+//         // Convert output → fullname
+//         user.fullname = buildFullName(user);
+//         delete user.firstName;
+//         delete user.lastName;
+
+//         const token = generateToken(user);
+
+//         return res.json({
+//           status: 200,
+//           message: 'OAuth login successful',
+//           results: { token, user }
+//         });
+//       }
+//     );
+//   } else {
+//     return res.status(400).json({
+//       status: 400,
+//       message: 'Unsupported provider.',
+//       results: null
+//     });
+//   }
+// };
 export const oauthLogin = async (req, res) => {
   const { provider, id_token, fcmToken } = req.body;
 
@@ -153,8 +315,8 @@ export const oauthLogin = async (req, res) => {
         idToken: id_token,
         audience: [
           process.env.GOOGLE_CLIENT_ID,
-          process.env.GOOGLE_CLIENT_ID_ANDROID
-        ]
+          process.env.GOOGLE_CLIENT_ID_ANDROID,
+        ],
       });
 
       const payload = ticket.getPayload();
@@ -164,51 +326,65 @@ export const oauthLogin = async (req, res) => {
         await db.select().from(users).where(eq(users.providerId, sub))
       )[0];
 
+      let isNewUser = false;
+
       if (!user) {
         user = (
           await db.select().from(users).where(eq(users.email, email))
         )[0];
 
         if (user) {
-          await db.update(users)
+          await db
+            .update(users)
             .set({ provider: 'google', providerId: sub })
             .where(eq(users.id, user.id));
-
-          user.provider = 'google';
-          user.providerId = sub;
         } else {
-          const insertResult = await db.insert(users).values({
-            id: uuidv4(),
-            firstName: given_name,
-            lastName: family_name || '',
-            email,
-            provider: 'google',
-            providerId: sub,
-            role: 'USER',
-            isEmailVerified: true
-          }).returning();
+          const insertResult = await db
+            .insert(users)
+            .values({
+              id: uuidv4(),
+              firstName: given_name,
+              lastName: family_name || '',
+              email,
+              provider: 'google',
+              providerId: sub,
+              role: 'USER',
+              isEmailVerified: true,
+            })
+            .returning();
+
           user = insertResult[0];
+          isNewUser = true;
         }
       }
 
-      // Save FCM if needed
-      if (fcmToken) {
-        const existingArr = await db.select().from(userFcmTokens).where(
-          and(
-            eq(userFcmTokens.userId, user.id),
-            eq(userFcmTokens.token, fcmToken)
-          )
-        );
+      if (isNewUser) {
+        await sendWelcomeEmail({
+          to: user.email,
+          fullname: buildFullName(user),
+        });
+      }
 
-        if (existingArr.length === 0) {
+      // Save FCM
+      if (fcmToken) {
+        const existing = await db
+          .select()
+          .from(userFcmTokens)
+          .where(
+            and(
+              eq(userFcmTokens.userId, user.id),
+              eq(userFcmTokens.token, fcmToken)
+            )
+          );
+
+        if (existing.length === 0) {
           await db.insert(userFcmTokens).values({
             userId: user.id,
-            token: fcmToken
+            token: fcmToken,
           });
         }
       }
 
-      // Convert output → fullname
       user.fullname = buildFullName(user);
       delete user.firstName;
       delete user.lastName;
@@ -218,92 +394,23 @@ export const oauthLogin = async (req, res) => {
       return res.json({
         status: 200,
         message: 'OAuth login successful',
-        results: { token, user }
+        results: { token, user },
       });
     } catch (error) {
       console.error(error);
       return res.status(401).json({
         status: 401,
         message: 'Invalid Google token.',
-        results: null
+        results: null,
       });
     }
   }
 
-  // ---------------- APPLE -----------------
-  if (provider === 'apple') {
-    jwt.verify(
-      id_token,
-      getAppleKey,
-      { algorithms: ['RS256'] },
-      async (err, payload) => {
-        if (err) {
-          console.error(err);
-          return res.status(401).json({
-            status: 401,
-            message: 'Invalid Apple token',
-            results: null
-          });
-        }
-
-        const { sub, email } = payload;
-
-        let user = (
-          await db.select().from(users).where(eq(users.providerId, sub))
-        )[0];
-
-        if (!user) {
-          const insertResult = await db.insert(users).values({
-            firstName: 'Apple',
-            lastName: 'User',
-            email,
-            provider: 'apple',
-            providerId: sub,
-            role: 'USER',
-            isEmailVerified: true
-          }).returning();
-
-          user = insertResult[0];
-        }
-
-        // Save FCM if needed
-        if (fcmToken) {
-          const existingArr = await db.select().from(userFcmTokens).where(
-            and(
-              eq(userFcmTokens.userId, user.id),
-              eq(userFcmTokens.token, fcmToken)
-            )
-          );
-
-          if (existingArr.length === 0) {
-            await db.insert(userFcmTokens).values({
-              userId: user.id,
-              token: fcmToken
-            });
-          }
-        }
-
-        // Convert output → fullname
-        user.fullname = buildFullName(user);
-        delete user.firstName;
-        delete user.lastName;
-
-        const token = generateToken(user);
-
-        return res.json({
-          status: 200,
-          message: 'OAuth login successful',
-          results: { token, user }
-        });
-      }
-    );
-  } else {
-    return res.status(400).json({
-      status: 400,
-      message: 'Unsupported provider.',
-      results: null
-    });
-  }
+  return res.status(400).json({
+    status: 400,
+    message: 'Unsupported provider.',
+    results: null,
+  });
 };
 
 
@@ -374,6 +481,11 @@ export const register = async (req, res) => {
 
     const user = insertResult[0];
     user.fullname = buildFullName(user);
+
+    await sendWelcomeEmail({
+      to: user.email,
+      fullname: user.fullname,
+    });
 
     delete user.firstName;
     delete user.lastName;

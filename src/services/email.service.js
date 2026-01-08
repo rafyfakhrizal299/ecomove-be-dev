@@ -29,3 +29,39 @@ export async function sendVerificationEmail(to, token) {
 
   return res.data;
 }
+export async function sendWelcomeEmail({ to, fullname }) {
+  try {
+    await axios.post(ELASTIC_URL, null, {
+      params: {
+        apikey: process.env.ELASTIC_EMAIL_API_KEY,
+        from: process.env.ELASTIC_EMAIL_FROM,
+        fromName: process.env.ELASTIC_EMAIL_FROM_NAME,
+        to,
+        subject: 'Welcome to Ecomove!',
+        bodyHtml: `
+          <div style="font-family: Arial, sans-serif;">
+            <h2>Welcome to Ecomove!</h2>
+            <p>Hi, <b>${fullname}</b>!</p>
+            <p>
+              Thank you for taking a step toward reducing carbon emissions and choosing
+              a more sustainable way to move goods.
+            </p>
+            <p>
+              We’re excited to have you with us and to take this eco-friendly journey.
+            </p>
+            <p><b>Welcome to Ecomove 💚</b></p>
+            <br/>
+            <p>
+              Best,<br/>
+              <b>Joy</b><br/>
+              Founder, Ecomove
+            </p>
+          </div>
+        `,
+        isTransactional: true,
+      },
+    });
+  } catch (err) {
+    console.error('Failed to send welcome email:', err.response?.data || err.message);
+  }
+}
