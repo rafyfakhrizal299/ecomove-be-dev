@@ -2,7 +2,7 @@ import { v4 as uuidv4 } from "uuid";
 import { db } from "../../drizzle/db.js";
 // import db from '../../lib/db.js';
 import { transactions, deliveryRates, savedAddresses, transactionReceivers, drivers, userFcmTokens, users, services} from "../../drizzle/schema.js";
-import { eq, and, lte, gte, isNull, or, sql, count, sum, inArray } from "drizzle-orm";
+import { eq, and, lte, gte, isNull, or, sql, count, sum, inArray, ne } from "drizzle-orm";
 
 import { getFirebaseMessagingService } from '../utils/fcmIntegration.js'; 
 //--------------------------------------------------------------------------------------------------------------------
@@ -470,7 +470,7 @@ export async function getAllTransactions(user) {
     .from(transactions)
     .leftJoin(drivers, eq(transactions.driverId, drivers.id))
     .where(
-      ne(transactions.status, 'cancelled')
+      ne(transactions.status, 'Cancelled')
     )
     .orderBy(
       sql`
@@ -783,7 +783,7 @@ export async function deleteTransaction(id) {
   await db
     .update(transactions)
     .set({
-      status: 'cancelled',
+      status: 'Cancelled',
       updatedAt: new Date()
     })
     .where(eq(transactions.id, id));
