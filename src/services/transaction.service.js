@@ -258,15 +258,21 @@ function normalizePinnedLocation(val) {
   return String(val);
 }
 async function generateTransactionId() {
+  const now = getPhilippinesNow()
+  const day = String(now.getDate()).padStart(2, '0')
+
   const result = await db.execute(sql`
-    SELECT MAX(CAST(SUBSTRING(id FROM 4) AS INTEGER)) AS max_id
+    SELECT MAX(CAST(SUBSTRING(id FROM 4 FOR 4) AS INTEGER)) AS max_seq
     FROM transactions
-    WHERE id LIKE 'eco%'
+    WHERE id LIKE ${'ECO%' + day}
   `)
 
-  const lastId = result.rows[0]?.max_id || 0
-  return `eco${lastId + 1}`
+  const lastSeq = result.rows[0]?.max_seq || 0
+  const nextSeq = String(lastSeq + 1).padStart(4, '0')
+
+  return `ECO${nextSeq}${day}`
 }
+
 export async function createTransaction(data) {
   try {
     let senderAddressId = data.senderAddressId || null
