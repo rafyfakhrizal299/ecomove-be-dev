@@ -462,16 +462,23 @@ function formatEtaFromSeconds(seconds) {
 }
 
 export async function getAllTransactions(user) {
-  let query = db
+  let whereCondition = undefined;
+
+  if (user.role !== 'ADMIN') {
+    whereCondition = and(
+      eq(transactions.userId, user.id),
+      ne(transactions.status, 'cancelled')
+    );
+  }
+
+  const rows = await db
     .select({
       transaction: transactions,
       driver: drivers,
     })
     .from(transactions)
     .leftJoin(drivers, eq(transactions.driverId, drivers.id))
-    .where(
-      ne(transactions.status, 'Cancelled')
-    )
+    .where(whereCondition)
     .orderBy(
       sql`
         CASE
@@ -486,15 +493,6 @@ export async function getAllTransactions(user) {
       `
     );
 
-  if (user.role !== 'ADMIN') {
-    query = query.where(
-      and(
-        eq(transactions.userId, user.id)
-      )
-    );
-  }
-
-  const rows = await query;
   if (rows.length === 0) return [];
 
   const transactionIds = rows.map(r => r.transaction.id);
@@ -537,6 +535,7 @@ export async function getAllTransactions(user) {
     };
   });
 }
+
 
 
 
