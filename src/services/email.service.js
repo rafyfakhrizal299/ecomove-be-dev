@@ -31,7 +31,7 @@ export async function sendVerificationEmail(to, token) {
 }
 export async function sendWelcomeEmail({ to, fullname }) {
   try {
-    await axios.post("https://api.elasticemail.com/v2/email/send", null, {
+    const response = await axios.post("https://api.elasticemail.com/v2/email/send", null, {
       params: {
         apikey: process.env.ELASTIC_EMAIL_API_KEY,
         from: process.env.ELASTIC_EMAIL_FROM,
@@ -61,6 +61,11 @@ export async function sendWelcomeEmail({ to, fullname }) {
         isTransactional: true,
       },
     });
+    console.log('✅ Elastic response:', response.data);
+
+    if (!response.data.success) {
+      console.error('❌ Elastic rejected:', response.data.error);
+    }
   } catch (err) {
     console.error('Failed to send welcome email:', err.response?.data || err.message);
   }
