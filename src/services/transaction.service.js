@@ -460,6 +460,7 @@ function formatEtaFromSeconds(seconds) {
 
   return parts.join(' ')
 }
+
 export async function getAllTransactions(user) {
   let query = db
     .select({
@@ -468,6 +469,9 @@ export async function getAllTransactions(user) {
     })
     .from(transactions)
     .leftJoin(drivers, eq(transactions.driverId, drivers.id))
+    .where(
+      ne(transactions.status, 'cancelled')
+    )
     .orderBy(
       sql`
         CASE
@@ -480,42 +484,46 @@ export async function getAllTransactions(user) {
           ELSE 0
         END ASC
       `
-    )
+    );
 
   if (user.role !== 'ADMIN') {
-    query = query.where(eq(transactions.userId, user.id))
+    query = query.where(
+      and(
+        eq(transactions.userId, user.id)
+      )
+    );
   }
 
-  const rows = await query
-  if (rows.length === 0) return []
+  const rows = await query;
+  if (rows.length === 0) return [];
 
-  const transactionIds = rows.map(r => r.transaction.id)
+  const transactionIds = rows.map(r => r.transaction.id);
 
   const receivers = await db
     .select()
     .from(transactionReceivers)
-    .where(inArray(transactionReceivers.transactionId, transactionIds))
+    .where(inArray(transactionReceivers.transactionId, transactionIds));
 
-  const receiverMap = {}
+  const receiverMap = {};
   for (const rc of receivers) {
     if (!receiverMap[rc.transactionId]) {
-      receiverMap[rc.transactionId] = []
+      receiverMap[rc.transactionId] = [];
     }
-    receiverMap[rc.transactionId].push(rc)
+    receiverMap[rc.transactionId].push(rc);
   }
 
   return rows.map(row => {
-    const trxReceivers = receiverMap[row.transaction.id] || []
+    const trxReceivers = receiverMap[row.transaction.id] || [];
 
     const totalEtaSeconds = trxReceivers.reduce(
       (sum, r) => sum + (Number(r.eta) || 0),
       0
-    )
+    );
 
     const totalCO2 = trxReceivers.reduce(
       (sum, r) => sum + (Number(r.co) || 0),
       0
-    )
+    );
 
     return {
       ...row.transaction,
@@ -524,11 +532,12 @@ export async function getAllTransactions(user) {
       totalCO2,
       receivers: trxReceivers.map(r => ({
         ...r,
-        etaFormatted: formatEtaFromSeconds(r.eta), // optional
+        etaFormatted: formatEtaFromSeconds(r.eta),
       })),
-    }
-  })
+    };
+  });
 }
+
 
 
 export async function getTransactionById(id) {
@@ -771,8 +780,15 @@ export async function cancelTransactionReceiver({
 
 
 export async function deleteTransaction(id) {
-  const [deleted] = await db.delete(transactions).where(eq(transactions.id, id)).returning();
-  return deleted;
+  await db
+    .update(transactions)
+    .set({
+      status: 'cancelled',
+      updatedAt: new Date()
+    })
+    .where(eq(transactions.id, id));
+
+  return true;
 }
 
 function formatETA(seconds) {
