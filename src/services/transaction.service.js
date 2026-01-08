@@ -337,7 +337,7 @@ export async function createTransaction(data) {
         deliveryNotes: data.deliveryNotes || null,
         orderid: null,
         paymentStatus: 'pending',
-        modeOfPayment: data.modeOfPayment || 'fiuuu',
+        modeOfPayment: [...new Set(data.receivers.map(r => r.methodofpayment))].join(', ') || '-',
         addAddress: data.addAddress ?? false,
       })
       .returning()
@@ -412,6 +412,7 @@ export async function createTransaction(data) {
           contactEmail: receiverData.contactEmail,
           deliveryType: rc.deliveryType,
           eVehicle: rc.eVehicle,
+          modeOfPayment: rc.modeOfPayment || 'cash-on-delivery',
           distance: rc.distance,
           fee: rc.fee,
           bringPouch: rc.bringPouch === true || rc.bringPouch === 'true',
@@ -438,6 +439,53 @@ export async function createTransaction(data) {
       .set({ totalFee, totalDistance })
       .where(eq(transactions.id, trx.id))
       .returning()
+
+      //push notif
+    try {
+      const transactionObject = updatedTrx;
+
+      if (transactionObject) {
+        const tokens = await db
+          .select()
+          .from(userFcmTokens)
+          .where(eq(userFcmTokens.userId, transactionObject.userId));
+
+        const registrationTokens = tokens
+          .map(t => t.token)
+          .filter(token => token && token.length > 0);
+
+        if (registrationTokens.length > 0) {
+          const payload = {
+            notification: {
+              title: "Transaction Booked Success",
+              body: `Your order #${transactionObject.id} has been successfully booked.`,
+            },
+            data: {
+              transactionId: String(transactionObject.id),
+              status: transactionObject.status || 'Booked',
+            },
+          };
+
+          const messaging = getFirebaseMessagingService();
+
+          const response = await messaging.sendEachForMulticast({
+            tokens: registrationTokens,
+            notification: payload.notification,
+            data: payload.data,
+          });
+
+          console.log(
+            `✅ Create Transaction notification sent to ${response.successCount} devices.`
+          );
+        } else {
+          console.log(
+            `⚠️ No FCM token found for user ${transactionObject.userId}`
+          );
+        }
+      }
+    } catch (err) {
+      console.error("❌ Failed to send create transaction notification:", err);
+    }
 
     return updatedTrx
   } catch (err) {

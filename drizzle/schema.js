@@ -94,7 +94,7 @@ export const transactions = pgTable('transactions', {
   orderid: varchar('orderid', { length: 100 }),
   tranID: varchar('tranID', { length: 100 }),
   paymentStatus: text('payment_status').default('pending'),
-  modeOfPayment: text('mode_of_payment').default('COD'),
+  modeOfPayment: text('mode_of_payment').default('cash-on-delivery'),
   status: text('status').default('Booked'), // pending | accepted | on-the-way | delivered | cancelled
 
   driverId: varchar("driver_id", { length: 255 }).references(() => drivers.id),
@@ -148,6 +148,7 @@ export const transactionReceivers = pgTable('transaction_receivers', {
   itemType: text('item_type'),
   packageType: text('package_type').notNull(),
   cod: boolean('cod').default(false),
+  modeOfPayment: text('mode_of_payment').default('cash-on-delivery'),
   itemProtection: boolean('item_protection').default(false),
   deliveryNotes: text('delivery_notes'),
   weight: numeric('weight'), // in KG
