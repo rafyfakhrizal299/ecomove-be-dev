@@ -38,7 +38,7 @@ export const getTransactionById = async (req, res) => {
     const { id } = req.params;
 
     // ✅ validasi eco<number>
-    if (!/^eco\d+$/.test(id)) {
+    if (!/^ECO\d{6}$/.test(id)) {
       return res.status(404).json({
         status: 404,
         message: "Transaction not found",
@@ -70,7 +70,7 @@ export const updateTransaction = async (req, res) => {
   try {
     const { id } = req.params;
 
-    if (!/^eco\d+$/.test(id)) {
+    if (!/^ECO\d{6}$/.test(id)) {
       return res.status(404).json({
         status: 404,
         message: "Transaction not found",
@@ -100,7 +100,7 @@ export const deleteTransaction = async (req, res) => {
   try {
     const { id } = req.params;
 
-    if (!/^eco\d+$/.test(id)) {
+    if (!/^ECO\d{6}$/.test(id)) {
       return res.status(404).json({
         status: 404,
         message: "Transaction not found",
