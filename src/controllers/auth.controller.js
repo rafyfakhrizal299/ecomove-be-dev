@@ -7,9 +7,8 @@ import db from '../../lib/db.js';
 import { v4 as uuidv4 } from 'uuid';
 import { and, ilike, eq, count, or, inArray, isNull, is } from 'drizzle-orm';
 import { users, services, userServices, userFcmTokens } from '../../drizzle/schema.js';
-import { sendVerificationEmail } from "../services/email.service.js";
+import { sendVerificationEmail, sendWelcomeEmail } from "../services/email.service.js";
 import { randomBytes } from "crypto";
-import { sendWelcomeEmail } from '../services/emailService';
 dotenv.config();
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
