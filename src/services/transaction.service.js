@@ -337,7 +337,7 @@ export async function createTransaction(data) {
         deliveryNotes: data.deliveryNotes || null,
         orderid: null,
         paymentStatus: 'pending',
-        modeOfPayment: [...new Set(data.receivers.map(r => r.methodofpayment))].join(', '),
+        modeOfPayment: [...new Set(data.receivers.map(r => r.modeOfPayment))].join(', '),
         addAddress: data.addAddress ?? false,
       })
       .returning()
