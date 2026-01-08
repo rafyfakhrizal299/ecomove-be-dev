@@ -467,7 +467,7 @@ export async function getAllTransactions(user) {
   if (user.role !== 'ADMIN') {
     whereCondition = and(
       eq(transactions.userId, user.id),
-      ne(transactions.status, 'cancelled')
+      ne(transactions.status, 'Cancelled')
     );
   }
 
