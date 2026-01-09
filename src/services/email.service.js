@@ -31,42 +31,34 @@ export async function sendVerificationEmail(to, token) {
 }
 export async function sendWelcomeEmail({ to, fullname }) {
   try {
-    const response = await axios.post("https://api.elasticemail.com/v2/email/send", null, {
-      params: {
-        apikey: process.env.ELASTIC_EMAIL_API_KEY,
-        from: process.env.ELASTIC_EMAIL_FROM,
-        fromName: process.env.ELASTIC_EMAIL_FROM_NAME,
-        to,
-        subject: 'Welcome to Ecomove!',
-        bodyHtml: `
-          <div style="font-family: Arial, sans-serif;">
-            <h2>Welcome to Ecomove!</h2>
-            <p>Hi, <b>${fullname}</b>!</p>
-            <p>
-              Thank you for taking a step toward reducing carbon emissions and choosing
-              a more sustainable way to move goods.
-            </p>
-            <p>
-              We’re excited to have you with us and to take this eco-friendly journey.
-            </p>
-            <p><b>Welcome to Ecomove 💚</b></p>
-            <br/>
-            <p>
-              Best,<br/>
-              <b>Joy</b><br/>
-              Founder, Ecomove
-            </p>
-          </div>
-        `,
-        isTransactional: true,
-      },
+    const info = await mailTransporter.sendMail({
+      from: `"${process.env.ELASTIC_EMAIL_FROM_NAME}" <${process.env.ELASTIC_EMAIL_FROM}>`,
+      to,
+      subject: 'Welcome to Ecomove!',
+      html: `
+        <div style="font-family: Arial, sans-serif;">
+          <h2>Welcome to Ecomove!</h2>
+          <p>Hi, <b>${fullname}</b>!</p>
+          <p>
+            Thank you for taking a step toward reducing carbon emissions and choosing
+            a more sustainable way to move goods.
+          </p>
+          <p>
+            We’re excited to have you with us and to take this eco-friendly journey.
+          </p>
+          <p><b>Welcome to Ecomove 💚</b></p>
+          <br/>
+          <p>
+            Best,<br/>
+            <b>Joy</b><br/>
+            Founder, Ecomove
+          </p>
+        </div>
+      `,
     });
-    console.log('✅ Elastic response:', response.data);
 
-    if (!response.data.success) {
-      console.error('❌ Elastic rejected:', response.data.error);
-    }
+    console.log('✅ Email sent:', info.messageId);
   } catch (err) {
-    console.error('Failed to send welcome email:', err.response?.data || err.message);
+    console.error('❌ Failed to send welcome email:', err.message);
   }
 }
