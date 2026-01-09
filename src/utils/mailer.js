@@ -1,11 +1,11 @@
 import nodemailer from 'nodemailer';
 
 export const mailTransporter = nodemailer.createTransport({
-  host: process.env.MAILTRAP_SMTP_HOST,
+  host: process.env.ELASTIC_SMTP_HOST,
   port: Number(process.env.ELASTIC_SMTP_PORT),
   secure: false,
   auth: {
-    user: process.env.MAILTRAP_SMTP_USER,
-    pass: process.env.MAILTRAP_SMTP_PASS,
+    user: process.env.ELASTIC_SMTP_USER,
+    pass: process.env.ELASTIC_SMTP_PASS,
   },
 });
