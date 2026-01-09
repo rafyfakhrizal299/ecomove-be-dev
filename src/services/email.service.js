@@ -1,5 +1,5 @@
 import axios from "axios";
-import { mailTransporter } from "../utils/mailer";
+import { mailTransporter } from "../utils/mailer.js";
 
 const ELASTIC_API_KEY = process.env.ELASTIC_API_KEY;
 
