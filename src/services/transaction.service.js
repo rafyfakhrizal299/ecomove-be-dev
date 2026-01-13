@@ -544,7 +544,8 @@ export async function getAllTransactions(user) {
           THEN 1
           ELSE 0
         END ASC
-      `
+      `,
+      desc(transactions.createdAt)
     );
 
   if (rows.length === 0) return [];
