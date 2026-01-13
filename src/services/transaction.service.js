@@ -2,7 +2,7 @@ import { v4 as uuidv4 } from "uuid";
 import { db } from "../../drizzle/db.js";
 // import db from '../../lib/db.js';
 import { transactions, deliveryRates, savedAddresses, transactionReceivers, drivers, userFcmTokens, users, services} from "../../drizzle/schema.js";
-import { eq, and, lte, gte, isNull, or, sql, count, sum, inArray, ne, asc, desc } from "drizzle-orm";
+import { eq, and, lte, gte, isNull, or, sql, count, sum, inArray, ne, asc, desc, ilike } from "drizzle-orm";
 
 import { getFirebaseMessagingService } from '../utils/fcmIntegration.js'; 
 //--------------------------------------------------------------------------------------------------------------------
