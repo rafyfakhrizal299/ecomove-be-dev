@@ -179,7 +179,10 @@ export const getTransactions = async (req, res) => {
     const search = req.query.search || null;
 
     const filters = {
-      status: req.query.filters.status || null,
+      status:
+        req.query.filters?.status ||
+        req.query['filters[status]'] ||
+        null,
     };
 
     const sortDate = req.query.sortDate || 'desc';
