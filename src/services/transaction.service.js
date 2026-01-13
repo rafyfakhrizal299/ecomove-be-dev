@@ -867,7 +867,11 @@ export async function getTransactions({ page = 1, limit = 10, search=null, filte
   if (filters.userId)
     conditions.push(eq(transactions.userId, filters.userId))
   if (filters.status) {
-    conditions.push(eq(transactions.status, filters.status));
+    const normalizedStatus = filters.status
+      .toUpperCase()
+      .replace(/\s+/g, '_');
+
+    conditions.push(eq(transactions.status, normalizedStatus));
   }
   if (search) {
     const keyword = `%${search}%`;
