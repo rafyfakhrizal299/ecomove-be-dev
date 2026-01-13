@@ -857,23 +857,51 @@ function formatETA(seconds) {
   return `${mins} min`
 }
 
-export async function getTransactions({ page = 1, limit = 10, search=null, filters = {}, sortDate = 'desc' }) {
-  const conditions = []
-  page = Number(page)
-  limit = Number(limit)
+import {
+  and,
+  or,
+  eq,
+  ilike,
+  asc,
+  desc,
+  sql,
+  inArray,
+} from 'drizzle-orm';
 
-  if (filters.paymentStatus)
-    conditions.push(eq(transactions.paymentStatus, filters.paymentStatus))
-  if (filters.userId)
-    conditions.push(eq(transactions.userId, filters.userId))
-  if (filters.status) {
-    const normalizedStatus = filters.status
-      .toUpperCase()
-      .replace(/\s+/g, '_');
+export async function getTransactions({
+  page = 1,
+  limit = 10,
+  search = null,
+  filters = {},
+  sortDate = 'desc',
+}) {
+  page = Number(page);
+  limit = Number(limit);
 
-    conditions.push(eq(transactions.status, normalizedStatus));
+  const conditions = [];
+
+  /* ===============================
+   * FILTERS
+   =============================== */
+
+  if (filters.paymentStatus) {
+    conditions.push(eq(transactions.paymentStatus, filters.paymentStatus));
   }
-  if (search) {
+
+  if (filters.userId) {
+    conditions.push(eq(transactions.userId, filters.userId));
+  }
+
+  // ✅ STATUS FILTER (AS-IS, SESUAI DB)
+  if (filters.status) {
+    conditions.push(eq(transactions.status, filters.status));
+  }
+
+  /* ===============================
+   * GLOBAL SEARCH
+   =============================== */
+
+  if (search && search.trim() !== '') {
     const keyword = `%${search}%`;
 
     conditions.push(
@@ -888,22 +916,30 @@ export async function getTransactions({ page = 1, limit = 10, search=null, filte
     );
   }
 
-  let whereCondition = undefined
-  if (conditions.length === 1) whereCondition = conditions[0]
-  else if (conditions.length > 1) whereCondition = and(...conditions)
+  /* ===============================
+   * WHERE CONDITION
+   =============================== */
 
-  const sanitizeUser = (user) => {
-    if (!user) return null
-    const { password, ...rest } = user
-    return rest
+  let whereCondition = undefined;
+  if (conditions.length === 1) {
+    whereCondition = conditions[0];
+  } else if (conditions.length > 1) {
+    whereCondition = and(...conditions);
   }
 
+  /* ===============================
+   * ORDER
+   =============================== */
 
   const orderByDate =
     sortDate === 'asc'
       ? asc(transactions.createdAt)
       : desc(transactions.createdAt);
-  
+
+  /* ===============================
+   * FETCH DATA
+   =============================== */
+
   const fetchTransactions = async (withLimit = true) => {
     let q = db
       .select({
@@ -915,25 +951,32 @@ export async function getTransactions({ page = 1, limit = 10, search=null, filte
       .leftJoin(drivers, eq(transactions.driverId, drivers.id))
       .leftJoin(users, eq(transactions.userId, users.id))
       .where(whereCondition)
-      .orderBy(orderByDate)
+      .orderBy(orderByDate);
 
     if (withLimit) {
-      q = q.limit(limit).offset((page - 1) * limit)
+      q = q.limit(limit).offset((page - 1) * limit);
     }
 
-    return q
-  }
+    return q;
+  };
+
+  /* ===============================
+   * TOTAL COUNT (WAJIB JOIN)
+   =============================== */
 
   const totalQuery = db
     .select({ count: sql`count(*)` })
     .from(transactions)
-    .where(whereCondition)
+    .leftJoin(drivers, eq(transactions.driverId, drivers.id))
+    .leftJoin(users, eq(transactions.userId, users.id))
+    .where(whereCondition);
 
-  const [{ count }] = await totalQuery
+  const [{ count }] = await totalQuery;
+
   const rows =
     page === 0 && limit === 0
       ? await fetchTransactions(false)
-      : await fetchTransactions(true)
+      : await fetchTransactions(true);
 
   if (rows.length === 0) {
     return {
@@ -944,42 +987,50 @@ export async function getTransactions({ page = 1, limit = 10, search=null, filte
         total: Number(count),
         totalPages: Math.ceil(Number(count) / limit),
       },
-    }
+    };
   }
 
-  /** ===============================
+  /* ===============================
    * FETCH RECEIVERS
    =============================== */
-  const transactionIds = rows.map((r) => r.transaction.id)
+
+  const transactionIds = rows.map((r) => r.transaction.id);
 
   const receivers = await db
     .select()
     .from(transactionReceivers)
-    .where(inArray(transactionReceivers.transactionId, transactionIds))
+    .where(inArray(transactionReceivers.transactionId, transactionIds));
 
-  const receiverMap = {}
+  const receiverMap = {};
   for (const rc of receivers) {
     if (!receiverMap[rc.transactionId]) {
-      receiverMap[rc.transactionId] = []
+      receiverMap[rc.transactionId] = [];
     }
-    receiverMap[rc.transactionId].push(rc)
+    receiverMap[rc.transactionId].push(rc);
   }
 
-  /** ===============================
+  /* ===============================
    * BUILD RESPONSE
    =============================== */
+
+  const sanitizeUser = (user) => {
+    if (!user) return null;
+    const { password, ...rest } = user;
+    return rest;
+  };
+
   const data = rows.map((r) => {
-    const trxReceivers = receiverMap[r.transaction.id] || []
+    const trxReceivers = receiverMap[r.transaction.id] || [];
 
     const totalETA = trxReceivers.reduce(
       (sum, x) => sum + (Number(x.eta) || 0),
       0
-    )
+    );
 
     const totalCO2 = trxReceivers.reduce(
       (sum, x) => sum + (Number(x.co) || 0),
       0
-    )
+    );
 
     return {
       ...r.transaction,
@@ -989,8 +1040,8 @@ export async function getTransactions({ page = 1, limit = 10, search=null, filte
       totalETAFormatted: formatETA(totalETA),
       totalCO2,
       receivers: trxReceivers,
-    }
-  })
+    };
+  });
 
   return {
     data,
@@ -998,7 +1049,8 @@ export async function getTransactions({ page = 1, limit = 10, search=null, filte
       page: page === 0 ? 1 : page,
       limit: page === 0 ? Number(count) : limit,
       total: Number(count),
-      totalPages: page === 0 ? 1 : Math.ceil(Number(count) / limit),
+      totalPages:
+        page === 0 ? 1 : Math.ceil(Number(count) / limit),
     },
-  }
+  };
 }
