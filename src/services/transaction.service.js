@@ -881,9 +881,18 @@ export async function getTransactions({
     conditions.push(eq(transactions.userId, filters.userId));
   }
 
-  // ✅ STATUS FILTER (AS-IS, SESUAI DB)
-  if (filters.status) {
-    conditions.push(eq(transactions.status, filters.status));
+  // ✅ STATUS FILTER - supports array of statuses or comma-separated string
+  let statusesArray = filters.statuses || filters.status;
+  if (typeof statusesArray === 'string') {
+    statusesArray = statusesArray.split(',').map(s => s.trim()).filter(s => s);
+  }
+  if (statusesArray && Array.isArray(statusesArray) && statusesArray.length > 0) {
+    conditions.push(inArray(transactions.status, statusesArray));
+  } else if (filters.status && typeof filters.status !== 'string' || (typeof filters.status === 'string' && filters.status.indexOf(',') === -1)) {
+    // Fallback for single status (legacy support)
+    if (filters.status) {
+      conditions.push(eq(transactions.status, filters.status));
+    }
   }
 
   /* ===============================
