@@ -857,7 +857,7 @@ function formatETA(seconds) {
   return `${mins} min`
 }
 
-export async function getTransactions({ page = 1, limit = 10, filters = {}, sortDate = 'desc' }) {
+export async function getTransactions({ page = 1, limit = 10, search=null, filters = {}, sortDate = 'desc' }) {
   const conditions = []
   page = Number(page)
   limit = Number(limit)
@@ -866,6 +866,23 @@ export async function getTransactions({ page = 1, limit = 10, filters = {}, sort
     conditions.push(eq(transactions.paymentStatus, filters.paymentStatus))
   if (filters.userId)
     conditions.push(eq(transactions.userId, filters.userId))
+  if (filters.status) {
+    conditions.push(eq(transactions.status, filters.status));
+  }
+  if (search) {
+    const keyword = `%${search}%`;
+
+    conditions.push(
+      or(
+        ilike(transactions.id, keyword),
+        ilike(transactions.orderid, keyword),
+        ilike(users.firstName, keyword),
+        ilike(users.lastName, keyword),
+        ilike(users.email, keyword),
+        ilike(drivers.name, keyword)
+      )
+    );
+  }
 
   let whereCondition = undefined
   if (conditions.length === 1) whereCondition = conditions[0]
@@ -876,6 +893,7 @@ export async function getTransactions({ page = 1, limit = 10, filters = {}, sort
     const { password, ...rest } = user
     return rest
   }
+
 
   const orderByDate =
     sortDate === 'asc'

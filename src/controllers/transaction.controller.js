@@ -176,9 +176,10 @@ export const getTransactions = async (req, res) => {
     const page = Number(req.query.page);
     const limit = Number(req.query.limit);
 
+    const search = req.query.search || null;
+
     const filters = {
-      paymentStatus: req.query.paymentStatus,
-      deliveryType: req.query.deliveryType,
+      status: req.query.status || null,
     };
 
     const sortDate = req.query.sortDate || 'desc';
@@ -186,6 +187,7 @@ export const getTransactions = async (req, res) => {
     let result = await trxService.getTransactions({
       page: Number.isNaN(page) || page <= 0 ? 1 : page,
       limit: Number.isNaN(limit) || limit <= 0 ? 10 : limit,
+      search,
       filters,
       sortDate,
     });
