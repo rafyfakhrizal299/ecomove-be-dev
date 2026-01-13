@@ -183,6 +183,7 @@ export const getTransactions = async (req, res) => {
         req.query.filters?.status ||
         req.query['filters[status]'] ||
         null,
+      statuses: req.query.statuses || null,
     };
 
     const sortDate = req.query.sortDate || 'desc';
