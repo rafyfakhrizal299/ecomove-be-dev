@@ -857,7 +857,7 @@ function formatETA(seconds) {
   return `${mins} min`
 }
 
-export async function getTransactions({ page = 1, limit = 10, filters = {} }) {
+export async function getTransactions({ page = 1, limit = 10, filters = {}, sortDate = 'desc' }) {
   const conditions = []
   page = Number(page)
   limit = Number(limit)
@@ -876,6 +876,12 @@ export async function getTransactions({ page = 1, limit = 10, filters = {} }) {
     const { password, ...rest } = user
     return rest
   }
+
+  const orderByDate =
+    sortDate === 'asc'
+      ? asc(transactions.createdAt)
+      : desc(transactions.createdAt);
+  
   const fetchTransactions = async (withLimit = true) => {
     let q = db
       .select({
@@ -887,6 +893,7 @@ export async function getTransactions({ page = 1, limit = 10, filters = {} }) {
       .leftJoin(drivers, eq(transactions.driverId, drivers.id))
       .leftJoin(users, eq(transactions.userId, users.id))
       .where(whereCondition)
+      .orderBy(orderByDate)
 
     if (withLimit) {
       q = q.limit(limit).offset((page - 1) * limit)

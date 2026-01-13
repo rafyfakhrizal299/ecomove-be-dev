@@ -181,10 +181,13 @@ export const getTransactions = async (req, res) => {
       deliveryType: req.query.deliveryType,
     };
 
+    const sortDate = req.query.sortDate || 'desc';
+
     let result = await trxService.getTransactions({
       page: Number.isNaN(page) || page <= 0 ? 1 : page,
       limit: Number.isNaN(limit) || limit <= 0 ? 10 : limit,
       filters,
+      sortDate,
     });
 
     if (req.user.role !== "ADMIN") {
