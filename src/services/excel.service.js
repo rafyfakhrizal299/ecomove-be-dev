@@ -2,10 +2,27 @@
 import ExcelJS from "exceljs";
 import { db } from "../../drizzle/db.js";
 import { transactions, drivers } from "../../drizzle/schema.js";
-import { eq, and, sql } from "drizzle-orm";
+import {
+  and,
+  eq,
+  inArray,
+  sql,
+} from "drizzle-orm";
 
 export async function generateTransactionExcel({ startDate, endDate }) {
-  // filter data sesuai periode (optional)
+  const changeTheMOP = (value) => {
+    if (!value) return '';
+
+    let mop = '';
+    const split = value.split(', ');
+
+    split.forEach((data, index) => {
+      mop += index === split.length - 1 ? data : data + ',';
+    });
+
+    return mop.replace(/-/g, ' ').toUpperCase();
+  };
+
   let where = undefined;
   if (startDate && endDate) {
     where = and(
@@ -16,41 +33,77 @@ export async function generateTransactionExcel({ startDate, endDate }) {
 
   const rows = await db
     .select({
-      id: transactions.id,
-      userId: transactions.userId,
-      status: transactions.status,
-      paymentStatus: transactions.paymentStatus,
-      totalFee: transactions.totalFee,
-      createdAt: transactions.createdAt,
-      driverName: drivers.name,
+      transaction: transactions,
+      driver: drivers,
     })
     .from(transactions)
     .leftJoin(drivers, eq(transactions.driverId, drivers.id))
     .where(where);
 
-  // buat workbook
+  if (!rows || rows.length === 0) {
+    const workbook = new ExcelJS.Workbook();
+    return workbook.xlsx.writeBuffer();
+  }
+
+  const transactionIds = rows.map(r => r.transaction.id);
+
+  const receivers = await db
+    .select()
+    .from(transactionReceivers)
+    .where(inArray(transactionReceivers.transactionId, transactionIds));
+
+  const receiverMap = {};
+  receivers.forEach(rc => {
+    if (!receiverMap[rc.transactionId]) {
+      receiverMap[rc.transactionId] = [];
+    }
+    receiverMap[rc.transactionId].push(rc);
+  });
+
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("Transactions");
 
-  // header
   sheet.columns = [
     { header: "ID", key: "id", width: 10 },
     { header: "User ID", key: "userId", width: 15 },
     { header: "Driver", key: "driverName", width: 20 },
     { header: "Status", key: "status", width: 15 },
     { header: "Payment Status", key: "paymentStatus", width: 20 },
+    { header: "Payment Method", key: "paymentMethod", width: 25 },
     { header: "Total Fee", key: "totalFee", width: 15 },
     { header: "Created At", key: "createdAt", width: 25 },
   ];
 
-  // isi data
-  rows.forEach((row) => {
+  rows.forEach(({ transaction, driver }) => {
+    const trxReceivers = receiverMap[transaction.id] || [];
+
+    const totalFee = trxReceivers.reduce(
+      (sum, r) => sum + (Number(r.fee) || 0),
+      0
+    );
+
+    const rawPaymentMethods = [
+      ...new Set(
+        trxReceivers.map(r => r.paymentMethod).filter(Boolean)
+      )
+    ].join(', ');
+
+    const paymentMethod = changeTheMOP(rawPaymentMethods);
+
     sheet.addRow({
-      ...row,
-      createdAt: row.createdAt ? row.createdAt.toISOString() : "",
+      id: transaction.id,
+      userId: transaction.userId,
+      driverName: driver ? driver.name : '-',
+      status: transaction.status,
+      paymentStatus: transaction.paymentStatus,
+      paymentMethod,
+      totalFee,
+      createdAt: transaction.createdAt
+        ? transaction.createdAt.toISOString()
+        : '',
     });
   });
 
-  // return buffer (biar bisa langsung di-download)
   return await workbook.xlsx.writeBuffer();
 }
+
