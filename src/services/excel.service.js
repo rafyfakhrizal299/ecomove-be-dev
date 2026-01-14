@@ -90,6 +90,8 @@ export async function generateTransactionExcel({ startDate, endDate }) {
 
     const paymentMethod = changeTheMOP(rawPaymentMethods);
 
+    console.log(paymentMethod)
+
     sheet.addRow({
       id: transaction.id,
       userId: transaction.userId,
