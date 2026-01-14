@@ -17,27 +17,26 @@ export async function generateTransactionExcel({ startDate, endDate }) {
   const formatPaymentMethods = (receivers) => {
     if (!receivers || receivers.length === 0) return '';
 
-    const unique = [];
     const seen = new Set();
+    const result = [];
 
     receivers.forEach(r => {
-      if (!r.paymentMethod) return;
+      if (!r.modeOfPayment) return;
 
-      const rawMethods = r.paymentMethod
+      r.modeOfPayment
         .split(',')
         .map(v => v.trim())
-        .filter(Boolean);
-
-      rawMethods.forEach(method => {
-        const normalized = method.toLowerCase();
-        if (!seen.has(normalized)) {
-          seen.add(normalized);
-          unique.push(method);
-        }
-      });
+        .filter(Boolean)
+        .forEach(method => {
+          const key = method.toLowerCase();
+          if (!seen.has(key)) {
+            seen.add(key);
+            result.push(method);
+          }
+        });
     });
 
-    return unique
+    return result
       .map(m =>
         m
           .replace(/-/g, ' ')
