@@ -1,7 +1,10 @@
-// services/excel.service.js
 import ExcelJS from "exceljs";
 import { db } from "../../drizzle/db.js";
-import { transactions, drivers, transactionReceivers } from "../../drizzle/schema.js";
+import {
+  transactions,
+  drivers,
+  transactionReceivers
+} from "../../drizzle/schema.js";
 import {
   and,
   eq,
@@ -10,17 +13,37 @@ import {
 } from "drizzle-orm";
 
 export async function generateTransactionExcel({ startDate, endDate }) {
-  const changeTheMOP = (value) => {
-    if (!value) return '';
 
-    let mop = '';
-    const split = value.split(', ');
+  const formatPaymentMethods = (receivers) => {
+    if (!receivers || receivers.length === 0) return '';
 
-    split.forEach((data, index) => {
-      mop += index === split.length - 1 ? data : data + ',';
+    const unique = [];
+    const seen = new Set();
+
+    receivers.forEach(r => {
+      if (!r.paymentMethod) return;
+
+      const rawMethods = r.paymentMethod
+        .split(',')
+        .map(v => v.trim())
+        .filter(Boolean);
+
+      rawMethods.forEach(method => {
+        const normalized = method.toLowerCase();
+        if (!seen.has(normalized)) {
+          seen.add(normalized);
+          unique.push(method);
+        }
+      });
     });
 
-    return mop.replace(/-/g, ' ').toUpperCase();
+    return unique
+      .map(m =>
+        m
+          .replace(/-/g, ' ')
+          .replace(/\b\w/g, c => c.toUpperCase())
+      )
+      .join(', ');
   };
 
   let where = undefined;
@@ -30,7 +53,6 @@ export async function generateTransactionExcel({ startDate, endDate }) {
       sql`${transactions.createdAt} <= ${new Date(endDate)}`
     );
   }
-
   const rows = await db
     .select({
       transaction: transactions,
@@ -69,11 +91,10 @@ export async function generateTransactionExcel({ startDate, endDate }) {
     { header: "Driver", key: "driverName", width: 20 },
     { header: "Status", key: "status", width: 15 },
     { header: "Payment Status", key: "paymentStatus", width: 20 },
-    { header: "Payment Method", key: "paymentMethod", width: 25 },
+    { header: "Payment Method", key: "paymentMethod", width: 30 },
     { header: "Total Fee", key: "totalFee", width: 15 },
     { header: "Created At", key: "createdAt", width: 25 },
   ];
-
   rows.forEach(({ transaction, driver }) => {
     const trxReceivers = receiverMap[transaction.id] || [];
 
@@ -82,15 +103,7 @@ export async function generateTransactionExcel({ startDate, endDate }) {
       0
     );
 
-    const rawPaymentMethods = [
-      ...new Set(
-        trxReceivers.map(r => r.paymentMethod).filter(Boolean)
-      )
-    ].join(', ');
-
-    const paymentMethod = changeTheMOP(rawPaymentMethods);
-
-    console.log(paymentMethod)
+    const paymentMethod = formatPaymentMethods(trxReceivers);
 
     sheet.addRow({
       id: transaction.id,
@@ -108,4 +121,3 @@ export async function generateTransactionExcel({ startDate, endDate }) {
 
   return await workbook.xlsx.writeBuffer();
 }
-
